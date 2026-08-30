@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Style My Scent is your personal fragrance stylist—helping you style, layer and shop your fragrance wardrobe with less guesswork." />
+  <title>Style My Scent | Your Personal Fragrance Stylist</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Allura&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--ink:#0c0b0b;--panel:#151312;--cream:#f6efe4;--muted:#c9bfb2;--gold:#c9a76a;--gold2:#f0d49a;--line:rgba(240,212,154,.22)}
+    *{box-sizing:border-box} html{scroll-behavior:smooth} body{margin:0;background:var(--ink);color:var(--cream);font-family:Inter,Arial,sans-serif}
+    body:before{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(circle at 80% 10%,rgba(201,167,106,.10),transparent 28%),radial-gradient(circle at 10% 45%,rgba(255,255,255,.035),transparent 25%)}
+    a{color:inherit;text-decoration:none}.wrap{width:min(1180px,92vw);margin:auto}.serif{font-family:"Cormorant Garamond",serif}
+    nav{height:78px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);position:relative;z-index:3}
+    .brand{font-family:"Cormorant Garamond",serif;font-size:28px;letter-spacing:.11em}.brand span{color:var(--gold2)}
+    .navlinks{display:flex;gap:26px;color:#d9d0c4;font-size:14px}.pill{border:1px solid var(--gold);padding:11px 17px;border-radius:999px;color:var(--gold2)}
+    .hero{min-height:700px;display:grid;grid-template-columns:1.1fr .9fr;gap:56px;align-items:center;padding:68px 0 78px}
+    .eyebrow{font-size:12px;letter-spacing:.22em;color:var(--gold2);font-weight:700;text-transform:uppercase}
+    h1{font-family:"Cormorant Garamond",serif;font-size:clamp(54px,7vw,92px);line-height:.91;margin:17px 0 22px;font-weight:600}
+    .lead{font-size:19px;line-height:1.75;color:#d6cdc1;max-width:650px}.hero strong{color:#fff}
+    .actions{display:flex;gap:13px;flex-wrap:wrap;margin-top:30px}.btn{border-radius:999px;padding:15px 22px;font-weight:700;border:1px solid var(--gold);cursor:pointer}
+    .btn.primary{background:linear-gradient(135deg,var(--gold2),#b78c48);color:#17120c;border:0}.btn.secondary{color:var(--cream)}
+    .portrait{position:relative;max-width:445px;margin-left:auto}.portrait:before{content:"";position:absolute;inset:-14px;border:1px solid var(--line);border-radius:210px 210px 28px 28px}
+    .portrait img{width:100%;display:block;border-radius:200px 200px 22px 22px;filter:saturate(.93)}
+    .addison-card{position:absolute;left:-55px;bottom:-50px;width:min(365px,90%);background:rgba(20,17,15,.92);border:1px solid var(--line);backdrop-filter:blur(14px);padding:17px 18px;border-radius:16px;box-shadow:0 18px 50px #0008}
+    .addison-name{font-family:"Allura",cursive;font-size:40px;font-weight:400;line-height:1;color:var(--gold2)}.addison-card p{font-family:Inter,Arial,sans-serif;font-weight:500;margin:8px 0 0;color:#eee4d8;font-size:14px;line-height:1.45}
+    
+    section{padding:92px 0;border-top:1px solid rgba(255,255,255,.06)}.center{text-align:center}.section-title{font-family:"Cormorant Garamond",serif;font-size:clamp(42px,5vw,64px);margin:10px 0 16px}.section-copy{max-width:760px;margin:0 auto;color:var(--muted);line-height:1.75}
+    .layers{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:44px}.card{background:linear-gradient(180deg,#181513,#11100f);border:1px solid var(--line);border-radius:22px;padding:28px;min-height:215px}.num{font-family:"Cormorant Garamond",serif;color:var(--gold2);font-size:42px}.card h3{font-family:"Cormorant Garamond",serif;font-size:30px;margin:8px 0}.card p{color:var(--muted);line-height:1.65}
+    .occasion{display:grid;grid-template-columns:.9fr 1.1fr;gap:24px;align-items:stretch}.quote{padding:46px;border:1px solid var(--line);border-radius:26px;background:linear-gradient(135deg,rgba(201,167,106,.10),rgba(255,255,255,.02))}.quote .big{font-family:"Cormorant Garamond",serif;font-size:48px;line-height:1.08}.occasion-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.mini{border:1px solid var(--line);background:#141210;border-radius:18px;padding:23px}.mini b{display:block;font-family:"Cormorant Garamond",serif;font-size:26px;margin-bottom:6px}.mini span{color:var(--muted);font-size:14px}
+    details.mini summary{list-style:none;cursor:pointer}details.mini summary::-webkit-details-marker{display:none}
+    details.mini summary:after{content:"＋";float:right;color:var(--gold2);font-size:20px;margin-top:-28px}
+    details.mini[open] summary:after{content:"−"}
+    .subchoices{display:flex;flex-wrap:wrap;gap:7px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+    .subchoices span{border:1px solid var(--line);border-radius:999px;padding:7px 10px;color:#e5dacd;font-size:12px}
+    .deal{border:1px solid var(--line);border-radius:30px;padding:60px;background:radial-gradient(circle at 90% 20%,rgba(201,167,106,.16),transparent 30%),#13110f}.deal h2{font-family:"Cormorant Garamond",serif;font-size:clamp(46px,6vw,76px);line-height:.98;margin:10px 0 20px;max-width:850px}.deal p{max-width:750px;color:var(--muted);font-size:18px;line-height:1.7}.deal-tag{display:inline-block;margin-top:20px;color:var(--gold2);font-weight:700;letter-spacing:.06em}
+    .feature-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:38px}.feature{padding:24px;border-left:1px solid var(--gold);background:rgba(255,255,255,.025)}.feature h3{font-family:"Cormorant Garamond",serif;font-size:27px;margin:0 0 8px}.feature p{color:var(--muted);font-size:14px;line-height:1.6;margin:0}
+    .join{padding:90px 0;text-align:center}.join-box{max-width:840px;margin:auto;border:1px solid var(--line);border-radius:28px;padding:54px 28px;background:#141210}.join h2{font-family:"Cormorant Garamond",serif;font-size:54px;margin:0 0 12px}.join p{color:var(--muted);line-height:1.7}.email{display:flex;max-width:570px;margin:26px auto 0;gap:10px}.email input{flex:1;background:#0d0c0b;border:1px solid var(--line);border-radius:999px;color:white;padding:15px 18px;outline:none}.email button{border:0;border-radius:999px;background:var(--gold2);padding:0 22px;font-weight:800}
+    footer{border-top:1px solid var(--line);padding:38px 0 48px;color:#9e958a;font-size:12px}.foot{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap}.legal{display:flex;gap:18px}
+    .notice{font-size:12px;color:#a69c90;margin-top:18px}
+    @media(max-width:800px){.navlinks{display:none}.hero{grid-template-columns:1fr;padding-top:45px}.portrait{margin:25px auto 0}.addison-card{left:8px}.layers,.feature-grid{grid-template-columns:1fr}.occasion{grid-template-columns:1fr}.deal{padding:38px 24px}.email{flex-direction:column}.email button{padding:15px}.occasion-grid{grid-template-columns:1fr 1fr}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <nav>
+      <div class="brand">STYLE MY <span>SCENT</span></div>
+      <div class="navlinks">
+        <a href="#layer">How It Works</a><a href="#deals">Deals</a><a href="#features">Discover</a><a class="pill" href="#join">Join the List</a>
+      </div>
+    </nav>
+
+    <main class="hero">
+      <div>
+        <div class="eyebrow">Your personal fragrance stylist</div>
+        <h1>You have it.<br><span style="color:var(--gold2)">Let’s discover how to wear it.</span></h1>
+        <p class="lead">From everyday moments to unforgettable occasions, <strong>Style My Scent</strong> takes the guesswork out of choosing your fragrance. We help style what you already own around your mood, your plans and the moment—so you can step into every occasion effortlessly and leave a lasting impression.</p>
+        <div class="actions"><a class="btn primary" href="#layer">DISCOVER STYLE MY SCENT ✨</a><a class="btn secondary" href="#deals">SEE SMARTER SHOPPING</a></div>
+      </div>
+      <div class="portrait">
+        <img src="addison.png" alt="Addison, the virtual fragrance stylist for Style My Scent">
+        <div class="addison-card">
+          <div><span class="addison-name">Addison</span></div>
+          <p>Hi, I’m Addison, your fragrance stylist.</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <section id="layer">
+    <div class="wrap center">
+      <div class="eyebrow">Layer beautifully</div>
+      <h2 class="section-title">A fragrance wardrobe, styled for you.</h2>
+      <p class="section-copy">Style My Scent considers the scented products in your collection and helps build combinations that make sense together. No imaginary products. No one-size-fits-all formula. Just your collection, styled with intention.</p>
+      <div class="layers">
+        <div class="card"><div class="num">01</div><h3>Lotions</h3><p>Begin with the scented body products you actually own and create a thoughtful foundation for the fragrance story.</p></div>
+        <div class="card"><div class="num">02</div><h3>Oils</h3><p>Add richness and dimension when an oil belongs in the combination—or skip it completely when it doesn’t.</p></div>
+        <div class="card"><div class="num">03</div><h3>Perfumes</h3><p>Finish with one fragrance, two fragrances, or a fuller layer chosen to suit the mood, weather and occasion.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap occasion">
+      <div class="quote">
+        <div class="eyebrow">Every occasion</div>
+        <div class="big">Flawlessly styled.<br>Without the stress.</div>
+        <p class="section-copy" style="margin:18px 0 0">Workday or wedding. Dinner or date night. Relaxed afternoon or unforgettable entrance. Tell us the moment and let your fragrance wardrobe rise to it.</p>
+      </div>
+      <div class="occasion-grid">
+        <details class="mini" open><summary><b>💼 Work</b><span>Polished, purposeful and appropriate for the room.</span></summary>
+          <div class="subchoices"><span>Regular Workday</span><span>Meeting / Presentation</span><span>Job Interview</span></div>
+        </details>
+        <details class="mini"><summary><b>❤️ Date Night</b><span>Style the scent around the kind of night you have planned.</span></summary>
+          <div class="subchoices"><span>First Date</span><span>Dinner Date</span><span>Cozy Night</span><span>Special Occasion</span></div>
+        </details>
+        <details class="mini"><summary><b>🍽️ Dinner</b><span>Memorable without competing with the table.</span></summary>
+          <div class="subchoices"><span>Casual Dinner</span><span>Upscale Dinner</span><span>Dinner Party</span></div>
+        </details>
+        <details class="mini"><summary><b>🍷 Event</b><span>Give Addison the room, dress code and energy.</span></summary>
+          <div class="subchoices"><span>Wedding</span><span>Party</span><span>Formal Event</span><span>Celebration</span></div>
+        </details>
+        <details class="mini"><summary><b>☀️ Casual</b><span>Easy choices that still feel intentionally styled.</span></summary>
+          <div class="subchoices"><span>Errands</span><span>Brunch</span><span>Day Out</span><span>Staying In</span></div>
+        </details>
+        <details class="mini"><summary><b>🏋️ Gym</b><span>Fresh, clean and close—never taking over the room.</span></summary>
+          <div class="subchoices"><span>Workout</span><span>Class</span><span>Post-Gym Plans</span></div>
+        </details>
+        <details class="mini"><summary><b>✈️ Travel</b><span>Comfortable scent choices for close quarters and long days.</span></summary>
+          <div class="subchoices"><span>Airport / Flight</span><span>Road Trip</span><span>Vacation Day</span><span>Travel Evening</span></div>
+        </details>
+        <div class="mini"><b>🎲 Surprise Me</b><span>Let Addison choose the direction from your collection.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="deals">
+    <div class="wrap">
+      <div class="deal">
+        <div class="eyebrow">Wishlist + Deals</div>
+        <h2>Stop searching for the deal.<br>Let the deal find you.</h2>
+        <p>No more endlessly opening retailer after retailer looking for the fragrance on your wishlist. Style My Scent is being designed to bring supported retailer offers together, help you compare options and make it easier to spot a better price—all from the fragrances you already want.</p>
+        <span class="deal-tag">♡ ADD IT. WATCH IT. SAVE ON IT.</span>
+        <div class="notice">Deal comparison, alerts and participating retailers will expand as retailer integrations become available. We do not display invented “live” prices.</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="features">
+    <div class="wrap center">
+      <div class="eyebrow">More than a perfume list</div>
+      <h2 class="section-title">Your collection can do more than sit there looking pretty.</h2>
+      <p class="section-copy">Style My Scent is being built around the way fragrance lovers actually collect, wear, discover and shop.</p>
+      <div class="feature-grid">
+        <div class="feature"><h3>Collection</h3><p>Keep perfumes, colognes, oils, lotions and mists together in one scent wardrobe.</p></div>
+        <div class="feature"><h3>Personal Styling</h3><p>Choose a vibe, destination and weather—or let Addison decide.</p></div>
+        <div class="feature"><h3>Style My Outfit</h3><p>Match fragrance to the colors, mood, formality and occasion of what you’re wearing.</p></div>
+        <div class="feature"><h3>Save My Wallet</h3><p>Explore similar scent DNA, affordable alternatives and collection overlap before buying another bottle.</p></div>
+        <div class="feature"><h3>Middle Eastern Discovery</h3><p>Give Middle Eastern fragrance houses the thoughtful coverage they deserve—not automatic “clone” labels.</p></div>
+        <div class="feature"><h3>Scent Journal</h3><p>Remember what you wore, what you loved and which combinations deserve another day out.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="join" class="join">
+    <div class="wrap">
+      <div class="join-box">
+        <div class="eyebrow">Style My Scent is growing</div>
+        <h2>Be first in the fragrance wardrobe.</h2>
+        <p>Join the early list for Style My Scent updates, feature previews and launch news.</p>
+        <form class="email" onsubmit="event.preventDefault(); document.getElementById('thanks').textContent='You’re on the list ✨';">
+          <input type="email" required placeholder="Your email address" aria-label="Email address">
+          <button type="submit">JOIN THE LIST</button>
+        </form>
+        <div id="thanks" style="margin-top:14px;color:var(--gold2)"></div>
+        <div class="notice">Demo signup for the first website version. We’ll connect this to a real email list before launch.</div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap foot">
+      <div><div class="brand" style="font-size:19px">STYLE MY <span>SCENT</span></div><div style="margin-top:8px">Your personal fragrance stylist.</div></div>
+      <div class="legal"><a href="privacy.html">Privacy</a><a href="disclosure.html">Affiliate Disclosure</a><a href="mailto:stylemyscentapp@gmail.com">Contact</a></div>
+      <div>© 2026 Style My Scent. Addison is a virtual fragrance stylist.</div>
+    </div>
+  </footer>
+</body>
+</html>
