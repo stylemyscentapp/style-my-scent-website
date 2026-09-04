@@ -1,5 +1,12 @@
 STYLE MY SCENT WEBSITE v1.4
 
+September 4, 2026 launch legal/support update:
+- Added complete responsive Privacy, Terms, Affiliate Disclosure, Support,
+  Contact, and Delete Account pages.
+- Added consistent legal navigation, footer links, accessibility focus styles,
+  page descriptions, and a backwards-compatible disclosure redirect.
+- Legal/business decisions are explicitly marked for review before publication.
+
 Open index.html in Chrome to preview it.
 
 Included:
