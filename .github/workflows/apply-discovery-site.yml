@@ -1,0 +1,38 @@
+name: Apply Discovery website pass
+
+on:
+  push:
+    paths:
+      - '.github/triggers/apply-discovery-site-v1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  site:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Patch website Discovery section
+        run: node scripts/apply-discovery-site-v1.mjs
+      - name: Verify required launch sections
+        run: |
+          grep -q 'id="discover"' index.html
+          grep -q 'discover.js' index.html
+          grep -q 'id="deals"' index.html
+          grep -q 'id="layering"' index.html
+      - name: Commit website Discovery section
+        run: |
+          if git diff --quiet; then
+            echo "No website Discovery changes were needed."
+            exit 0
+          fi
+          git config user.name "style-my-scent-bot"
+          git config user.email "style-my-scent-bot@users.noreply.github.com"
+          git add index.html
+          git commit -m "feat: add live Discovery section to website"
+          git push origin HEAD:main
