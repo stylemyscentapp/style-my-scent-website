@@ -1,0 +1,36 @@
+name: Update Discover tagline
+
+on:
+  push:
+    paths:
+      - '.github/triggers/update-discover-tagline-v1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Update Discover tagline
+        run: node scripts/update-discover-tagline-v1.mjs
+      - name: Validate markup
+        run: node -e "const s=require('fs').readFileSync('index.html','utf8'); if(!s.includes('Smell expensive, spend smarter.')) process.exit(1);"
+      - name: Commit website change
+        run: |
+          if git diff --quiet; then
+            echo "No changes needed."
+            exit 0
+          fi
+          git config user.name "style-my-scent-bot"
+          git config user.email "style-my-scent-bot@users.noreply.github.com"
+          git add index.html
+          git commit -m "copy: smell expensive, spend smarter"
+          git push origin HEAD:main
