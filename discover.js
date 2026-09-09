@@ -28,3 +28,30 @@ async function loadStyleMyScentDiscovery(){
 }
 
 document.addEventListener('DOMContentLoaded',loadStyleMyScentDiscovery);
+
+async function loadVerifiedComparisonScores(){
+  async function scoreFor({brand,name,comparedBrand,comparedName}){
+    const h={apikey:SMS_SUPABASE_KEY,Authorization:`Bearer ${SMS_SUPABASE_KEY}`};
+    const fq=new URLSearchParams({select:'id',brand:`ilike.${brand}`,canonical_name:`ilike.${name}`,is_active:'eq.true',verification_status:'eq.verified',limit:'8'});
+    const fr=await fetch(`${SMS_SUPABASE_URL}/rest/v1/fragrances?${fq}`,{headers:h});
+    if(!fr.ok)return null;
+    const ids=(await fr.json()).map(x=>x.id).filter(Boolean);
+    if(!ids.length)return null;
+    const cq=new URLSearchParams({select:'estimated_similarity,verification_state,evidence_count',fragrance_id:`in.(${ids.join(',')})`,verification_state:'eq.verified',compared_brand:`ilike.${comparedBrand}`,compared_name:`ilike.${comparedName}`,order:'evidence_count.desc.nullslast',limit:'1'});
+    const cr=await fetch(`${SMS_SUPABASE_URL}/rest/v1/fragrance_comparisons?${cq}`,{headers:h});
+    if(!cr.ok)return null;
+    const row=(await cr.json())[0];
+    const n=Number(row?.estimated_similarity);
+    return Number.isFinite(n)?Math.round(n):null;
+  }
+  const [women,men]=await Promise.all([
+    scoreFor({brand:'Armaf',name:'Club de Nuit Woman',comparedBrand:'Chanel',comparedName:'Coco Mademoiselle'}),
+    scoreFor({brand:'Lattafa',name:'Asad',comparedBrand:'Dior',comparedName:'Sauvage Elixir'}),
+  ]);
+  const w=document.getElementById('women-similarity-label');
+  const m=document.getElementById('men-similarity-label');
+  if(w && Number.isFinite(women)) w.textContent=`≈ ${women}% SIMILAR`;
+  if(m && Number.isFinite(men)) m.textContent=`≈ ${men}% SIMILAR`;
+}
+
+document.addEventListener('DOMContentLoaded',()=>{loadVerifiedComparisonScores().catch(()=>{});});
