@@ -1,0 +1,42 @@
+name: Update website Discover showcase
+
+on:
+  push:
+    paths:
+      - '.github/triggers/update-discover-showcase-v2'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Update Discover showcase
+        run: node scripts/update-discover-showcase-v2.mjs
+      - name: Validate website markup
+        run: |
+          grep -q "Chanel<br>Coco Mademoiselle" index.html
+          grep -q "Armaf<br>Club de Nuit Woman" index.html
+          grep -q "Dior<br>Sauvage Elixir" index.html
+          grep -q "Lattafa<br>Asad" index.html
+          grep -q "SHOP &amp; EXPLORE IN THE APP" index.html
+          test "$(grep -o 'section id="discover"' index.html | wc -l)" -eq 1
+      - name: Commit website change
+        run: |
+          if git diff --quiet; then
+            echo "No website Discover change needed."
+            exit 0
+          fi
+          git config user.name "style-my-scent-bot"
+          git config user.email "style-my-scent-bot@users.noreply.github.com"
+          git add index.html
+          git commit -m "feat: replace Discovery feed with similarity showcase"
+          git push origin HEAD:main
