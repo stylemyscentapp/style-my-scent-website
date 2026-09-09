@@ -1,0 +1,38 @@
+name: Clean Discovery website duplicates
+
+on:
+  push:
+    paths:
+      - '.github/triggers/cleanup-discovery-site-v1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Remove duplicate Discovery markup
+        run: node scripts/cleanup-discovery-site-v1.mjs
+      - name: Verify one live Discover section
+        run: |
+          test "$(grep -o 'id="discover"' index.html | wc -l)" -eq 1
+          test "$(grep -o 'href="#discover"' index.html | wc -l)" -eq 1
+          grep -q 'id="discover-grid"' index.html
+          grep -q 'discover.js' index.html
+      - name: Commit cleanup
+        run: |
+          if git diff --quiet; then
+            echo "No cleanup changes needed."
+            exit 0
+          fi
+          git config user.name "style-my-scent-bot"
+          git config user.email "style-my-scent-bot@users.noreply.github.com"
+          git add index.html
+          git commit -m "fix: keep one live Discovery section"
+          git push origin HEAD:main
