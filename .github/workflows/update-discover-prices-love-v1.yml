@@ -1,0 +1,36 @@
+name: Update Discover pricing headline
+
+on:
+  push:
+    paths:
+      - '.github/triggers/update-discover-prices-love-v1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Update Discover headline
+        run: node scripts/update-discover-prices-love-v1.mjs
+      - name: Validate markup
+        run: node -e "const fs=require('fs'); const s=fs.readFileSync('index.html','utf8'); if(!s.includes('Scents you like at prices you love.')) process.exit(1);"
+      - name: Commit website change
+        run: |
+          if git diff --quiet; then
+            echo "No website changes needed."
+            exit 0
+          fi
+          git config user.name "style-my-scent-bot"
+          git config user.email "style-my-scent-bot@users.noreply.github.com"
+          git add index.html
+          git commit -m "copy: scents you like at prices you love"
+          git push origin HEAD:main
