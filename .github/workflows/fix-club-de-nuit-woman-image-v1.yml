@@ -1,0 +1,36 @@
+name: Fix Club de Nuit Woman image
+
+on:
+  push:
+    paths:
+      - '.github/triggers/fix-club-de-nuit-woman-image-v1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Fix bottle image
+        run: node scripts/fix-club-de-nuit-woman-image-v1.mjs
+      - name: Validate website markup
+        run: |
+          grep -q "Club de Nuit Woman" index.html
+          grep -q "armuf_women_105ml_1_1800x1800.jpg" index.html
+      - name: Commit website change
+        run: |
+          if git diff --quiet; then
+            echo "No image change needed."
+            exit 0
+          fi
+          git config user.name "style-my-scent-bot"
+          git config user.email "style-my-scent-bot@users.noreply.github.com"
+          git add index.html
+          git commit -m "fix: use correct Club de Nuit Woman bottle image"
+          git push origin HEAD:main
