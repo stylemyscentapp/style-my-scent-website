@@ -1,0 +1,38 @@
+name: Update Discover copy and order
+
+on:
+  push:
+    paths:
+      - '.github/triggers/update-discover-copy-order-v1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Update Discover section
+        run: node scripts/update-discover-copy-order-v1.mjs
+      - name: Validate website markup
+        run: |
+          grep -q "Smell expensive, spend smarter." index.html
+          grep -q "Find fragrances with a similar scent direction" index.html
+      - name: Commit website change
+        run: |
+          if git diff --quiet; then
+            echo "No changes needed."
+            exit 0
+          fi
+          git config user.name "style-my-scent-bot"
+          git config user.email "style-my-scent-bot@users.noreply.github.com"
+          git add index.html
+          git commit -m "fix: broaden Discover copy and move app CTA up"
+          git push origin HEAD:main
