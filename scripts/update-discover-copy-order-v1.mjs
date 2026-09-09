@@ -1,0 +1,15 @@
+import fs from 'node:fs';
+const file='index.html';
+let src=fs.readFileSync(file,'utf8');
+const oldIntro='<p class="discover-intro">Find Middle Eastern fragrances with a similar scent direction to designer favorites, see why they’re alike, then shop and explore directly through the Style My Scent app.</p>';
+const newIntro='<p class="discover-intro">Find fragrances with a similar scent direction to designer favorites, see why they’re alike, then shop and explore directly through the Style My Scent app.</p>';
+if(!src.includes(oldIntro)) throw new Error('Discover intro copy not found');
+src=src.replace(oldIntro,newIntro);
+const oldCta=`  <div class="discover-app-cta">\n    <div><div class="eyebrow">AVAILABLE IN STYLE MY SCENT</div><h3>Smell expensive, spend smarter.</h3><p>Shop and explore directly through the Style My Scent app — with verified retailer offers when available.</p></div>\n    <a class="discover-app-btn" href="#get-app">SHOP &amp; EXPLORE IN THE APP</a>\n  </div>`;
+if(!src.includes(oldCta)) throw new Error('Discover CTA block not found');
+src=src.replace(oldCta,'');
+const marker='  <div class="similarity-grid">';
+if(!src.includes(marker)) throw new Error('Similarity grid marker not found');
+src=src.replace(marker,`${oldCta}\n${marker}`);
+fs.writeFileSync(file,src);
+console.log('Updated Discover copy and moved app CTA above comparisons.');
