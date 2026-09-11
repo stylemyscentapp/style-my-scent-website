@@ -1,0 +1,36 @@
+name: Website smoke check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  site-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Discover JavaScript
+        run: node --check discover.js
+
+      - name: Verify launch legal and support pages
+        run: |
+          test "$(cat CNAME)" = "stylemyscent.com"
+          for file in privacy.html terms.html affiliate-disclosure.html support.html contact.html delete-account.html; do
+            test -s "$file"
+          done
+          grep -q 'privacy.html' index.html
+          grep -q 'terms.html' index.html
+          grep -q 'affiliate-disclosure.html' index.html
+          grep -q 'support.html' index.html
+          grep -q 'delete-account.html' index.html
+
+      - name: Verify Discover affiliate safety
+        run: |
+          grep -q "rel='sponsored noopener noreferrer'" discover.js
+          grep -q "safeHttpsUrl" discover.js
+          grep -q "affiliate_url" discover.js
