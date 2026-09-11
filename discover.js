@@ -1,6 +1,22 @@
 const SMS_SUPABASE_URL='https://kdspdaffkbxxxgxlfnjo.supabase.co';
 const SMS_SUPABASE_KEY='sb_publishable_KCHzj9dxjrN_Jzzo0b1weQ_7LktkdMB';
 
+function safeHttpsUrl(value=''){
+  try{
+    const url=new URL(String(value || ''));
+    return url.protocol==='https:' ? url.href : '';
+  }catch{
+    return '';
+  }
+}
+
+function textEl(tag,className,text){
+  const el=document.createElement(tag);
+  if(className) el.className=className;
+  el.textContent=String(text ?? '');
+  return el;
+}
+
 async function loadStyleMyScentDiscovery(){
   const host=document.getElementById('discover-grid');
   const status=document.getElementById('discover-status');
@@ -12,13 +28,50 @@ async function loadStyleMyScentDiscovery(){
     });
     if(!response.ok) throw new Error('Discovery unavailable');
     const rows=await response.json();
-    host.innerHTML='';
+    host.replaceChildren();
+
     rows.forEach(row=>{
       const card=document.createElement('article');
       card.className='discover-card';
-      const image=row.image_url ? `<img src="${row.image_url}" alt="${row.brand} ${row.canonical_name}" loading="lazy">` : `<div class="discover-fallback">SMS</div>`;
+
+      const imageUrl=safeHttpsUrl(row.image_url);
+      if(imageUrl){
+        const img=document.createElement('img');
+        img.src=imageUrl;
+        img.alt=`${String(row.brand || '')} ${String(row.canonical_name || '')}`.trim() || 'Fragrance bottle';
+        img.loading='lazy';
+        img.referrerPolicy='no-referrer';
+        card.appendChild(img);
+      }else{
+        card.appendChild(textEl('div','discover-fallback','SMS'));
+      }
+
+      const copy=document.createElement('div');
+      copy.className='discover-card-copy';
+      copy.appendChild(textEl('div','discover-meta',`${row.is_new?'NEW • ':''}${row.brand || ''}`));
+      copy.appendChild(textEl('h3','',row.canonical_name || 'Fragrance'));
+
       const price=Number(row.price);
-      card.innerHTML=`${image}<div class="discover-card-copy"><div class="discover-meta">${row.is_new?'NEW • ':''}${row.brand}</div><h3>${row.canonical_name}</h3><p>${row.concentration||'Fragrance'}${Number.isFinite(price)?` • from $${price.toFixed(2)}`:''}</p><span>Ready to style • verified shopping match</span></div>`;
+      const detail=`${row.concentration || 'Fragrance'}${Number.isFinite(price)?` • from $${price.toFixed(2)}`:''}`;
+      copy.appendChild(textEl('p','',detail));
+      copy.appendChild(textEl('span','','Ready to style • verified shopping match'));
+
+      const affiliateUrl=safeHttpsUrl(row.affiliate_url);
+      if(affiliateUrl){
+        const actions=document.createElement('div');
+        actions.className='discover-actions';
+        const shop=document.createElement('a');
+        shop.className='mini-btn';
+        shop.href=affiliateUrl;
+        shop.target='_blank';
+        shop.rel='sponsored noopener noreferrer';
+        shop.textContent=`VIEW AT ${String(row.retailer_name || 'RETAILER').toUpperCase()}`;
+        shop.setAttribute('aria-label',`View ${String(row.brand || '')} ${String(row.canonical_name || '')} at ${String(row.retailer_name || 'retailer')}`.trim());
+        actions.appendChild(shop);
+        copy.appendChild(actions);
+      }
+
+      card.appendChild(copy);
       host.appendChild(card);
     });
     if(status) status.textContent=rows.length?'Live launch picks refresh automatically.':'Discovery is refreshing.';
