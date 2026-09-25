@@ -100,18 +100,46 @@ async function fetchComparisons(query=''){
   });
   if(!response.ok) throw new Error('Discover unavailable');
   const rows=await response.json();
-  const seen=new Set();
-  return rows.filter(row=>{
+  const seenPairs=new Set();
+  const cleaned=rows.filter(row=>{
     const similarity=Number(row.estimated_similarity);
     if(!Number.isFinite(similarity) || similarity<60) return false;
     const key=[
       normalized(row.alternative_brand),normalized(row.alternative_name),
       normalized(row.original_brand),normalized(row.original_name)
     ].join('|');
-    if(seen.has(key)) return false;
-    seen.add(key);
+    if(seenPairs.has(key)) return false;
+    seenPairs.add(key);
     return true;
   });
+
+  // A broad brand search such as "Gucci" should browse the brand, not show
+  // eight different alternatives for the same Gucci Bloom bottle. Keep one
+  // strongest comparison per original fragrance for single-word brand queries.
+  // A more specific scent search such as "Gucci Bloom" still shows its different
+  // verified alternatives so shoppers can compare options.
+  const queryWords=normalized(q).split(' ').filter(Boolean);
+  if(queryWords.length===1){
+    const exactBrand=cleaned.filter(row=>
+      normalized(row.original_brand)===queryWords[0] ||
+      normalized(row.alternative_brand)===queryWords[0]
+    );
+    const source=exactBrand.length?exactBrand:cleaned;
+    const bestByBottle=new Map();
+    for(const row of source){
+      const originalMatches=normalized(row.original_brand)===queryWords[0];
+      const bottleKey=originalMatches
+        ? ['original',normalized(row.original_brand),normalized(row.original_name),normalized(row.original_concentration)].join('|')
+        : ['alternative',normalized(row.alternative_brand),normalized(row.alternative_name),normalized(row.alternative_concentration)].join('|');
+      const existing=bestByBottle.get(bottleKey);
+      if(!existing || Number(row.estimated_similarity)>Number(existing.estimated_similarity)){
+        bestByBottle.set(bottleKey,row);
+      }
+    }
+    return [...bestByBottle.values()].sort((a,b)=>Number(b.estimated_similarity)-Number(a.estimated_similarity));
+  }
+
+  return cleaned;
 }
 
 async function fetchProfile(product){
