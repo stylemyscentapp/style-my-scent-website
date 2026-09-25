@@ -366,7 +366,14 @@ async function fetchAffiliateOffers(product){
   }
 }
 
+const SMS_AMAZON_DIRECT_LINKS=new Map([
+  ['lattafa|layaan','https://amzn.to/4xNzddf']
+]);
+
 function amazonUrl(product){
+  const key=[normalized(product?.brand),normalized(product?.name)].join('|');
+  const direct=SMS_AMAZON_DIRECT_LINKS.get(key);
+  if(direct) return direct;
   const q=[product.brand,product.name,product.concentration].filter(Boolean).join(' ');
   return 'https://www.amazon.com/s?k='+encodeURIComponent(q)+'&tag='+encodeURIComponent(SMS_AMAZON_TAG);
 }
