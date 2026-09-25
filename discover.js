@@ -18,8 +18,8 @@ function textEl(tag,className,text){
 }
 
 async function loadStyleMyScentDiscovery(){
-  const host=document.getElementById('discover-grid');
-  const status=document.getElementById('discover-status');
+  const host=document.getElementById('live-deal-grid') || document.getElementById('discover-grid');
+  const status=document.getElementById('live-deal-status') || document.getElementById('discover-status');
   if(!host) return;
   try{
     const select='fragrance_id,brand,canonical_name,concentration,image_url,retailer_name,price,affiliate_url,is_new,reason';
@@ -54,7 +54,7 @@ async function loadStyleMyScentDiscovery(){
       const price=Number(row.price);
       const detail=`${row.concentration || 'Fragrance'}${Number.isFinite(price)?` • from $${price.toFixed(2)}`:''}`;
       copy.appendChild(textEl('p','',detail));
-      copy.appendChild(textEl('span','','Ready to style • verified shopping match'));
+      copy.appendChild(textEl('span','','Ready to style • verified shopping match'));\n      copy.appendChild(textEl('span','','Paid links • commissions may be earned'));
 
       const affiliateUrl=safeHttpsUrl(row.affiliate_url);
       if(affiliateUrl){
@@ -68,6 +68,17 @@ async function loadStyleMyScentDiscovery(){
         shop.textContent=`VIEW AT ${String(row.retailer_name || 'RETAILER').toUpperCase()}`;
         shop.setAttribute('aria-label',`View ${String(row.brand || '')} ${String(row.canonical_name || '')} at ${String(row.retailer_name || 'retailer')}`.trim());
         actions.appendChild(shop);
+
+        const amazon=document.createElement('a');
+        const amazonQuery=[row.brand,row.canonical_name,row.concentration].filter(Boolean).join(' ');
+        amazon.className='mini-btn';
+        amazon.href=`https://www.amazon.com/s?k=${encodeURIComponent(amazonQuery)}&tag=stylemyscent-20`;
+        amazon.target='_blank';
+        amazon.rel='sponsored noopener noreferrer';
+        amazon.textContent='SEARCH AMAZON';
+        amazon.setAttribute('aria-label',`Search Amazon for ${String(row.brand || '')} ${String(row.canonical_name || '')}`.trim());
+        actions.appendChild(amazon);
+
         copy.appendChild(actions);
       }
 
