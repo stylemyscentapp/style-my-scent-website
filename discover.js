@@ -23,14 +23,27 @@ async function loadStyleMyScentDiscovery(){
   if(!host) return;
   try{
     const select='fragrance_id,brand,canonical_name,concentration,image_url,retailer_name,price,affiliate_url,is_new,reason';
-    const response=await fetch(`${SMS_SUPABASE_URL}/rest/v1/catalog_discovery_feed?select=${select}&order=discovery_score.desc,brand.asc,canonical_name.asc&limit=8`,{
+    const response=await fetch(`${SMS_SUPABASE_URL}/rest/v1/catalog_discovery_feed?select=${select}&order=discovery_score.desc,brand.asc,canonical_name.asc&limit=30`,{
       headers:{apikey:SMS_SUPABASE_KEY,Authorization:`Bearer ${SMS_SUPABASE_KEY}`},
     });
     if(!response.ok) throw new Error('Discovery unavailable');
-    const rows=await response.json();
+    const allRows=await response.json();
+    const rows=[];
+    const seenRetailers=new Set();
+    for(const row of allRows){
+      const retailer=String(row.retailer_name || '').toLowerCase();
+      if(retailer && !seenRetailers.has(retailer)){
+        rows.push(row);
+        seenRetailers.add(retailer);
+      }
+    }
+    for(const row of allRows){
+      if(rows.length>=8) break;
+      if(!rows.includes(row)) rows.push(row);
+    }
     host.replaceChildren();
 
-    rows.forEach(row=>{
+    rows.slice(0,8).forEach(row=>{
       const card=document.createElement('article');
       card.className='discover-card';
 
@@ -85,7 +98,7 @@ async function loadStyleMyScentDiscovery(){
       card.appendChild(copy);
       host.appendChild(card);
     });
-    if(status) status.textContent=rows.length?'Live launch picks refresh automatically.':'Discovery is refreshing.';
+    if(status) status.textContent=rows.length?'Live partner picks refresh automatically — eCosmetics, FragranceShop.com and Amazon shopping options are enabled.':'Discovery is refreshing.';
   }catch(error){
     if(status) status.textContent='Discovery is refreshing. The app will always show the newest ready-to-shop picks.';
   }
