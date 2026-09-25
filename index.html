@@ -112,6 +112,7 @@ footer{border-top:1px solid var(--line);padding:38px 0 48px;color:#9f9589;font-s
 document.getElementById('waitlist-form').addEventListener('submit',async(e)=>{e.preventDefault();const email=document.getElementById('waitlist-email').value.trim();const status=document.getElementById('waitlist-status');status.textContent='Adding you…';try{const r=await fetch('https://kdspdaffkbxxxgxlfnjo.supabase.co/functions/v1/website-launch-signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});if(!r.ok)throw new Error('signup failed');status.textContent='You’re on the list — we’ll let you know when Style My Scent launches.';e.target.reset()}catch(err){status.textContent='Something went wrong. Please try again.'}});
 </script>
 
+  <script src="https://www.anrdoezrs.net/am/101873859/include/joined/sid/website_deals/am.js"></script>
   <script src="https://www.anrdoezrs.net/am/101873859/include/joined/impressions/page/am.js"></script>
 </body>
 </html>
