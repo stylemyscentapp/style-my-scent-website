@@ -116,7 +116,9 @@ function bottleSide(product,kicker){
 
 
 function comparisonCopyIsCustomerReady(row){
-  const bad=/(limited shared|independent comparison evidence|catalog currently|owner research|resolution file|database|machine|source-note|evidence links|research is still|not supplied)/i;
+  const badSimilarity=/(limited shared|independent comparison evidence|catalog currently|owner research|resolution file|database|machine|source-note|evidence links|research is still|not supplied|owner-approved resolution|supplied snapshot)/i;
+  const badDifference=/(owner research|resolution file|database|machine|source-note|evidence|not supplied|catalog currently)/i;
+  const badVerdict=/(OWNER_VERIFIED|owner-verified|human research|database|machine|resolution|still filling|still gathering|not enough|unsure)/i;
   return Boolean(
     row &&
     row.compared_fragrance_id &&
@@ -125,9 +127,9 @@ function comparisonCopyIsCustomerReady(row){
     String(row.similarities||'').trim() &&
     String(row.differences||'').trim() &&
     String(row.verdict||'').trim() &&
-    !bad.test(String(row.similarities||'')) &&
-    !bad.test(String(row.differences||'')) &&
-    !bad.test(String(row.verdict||''))
+    !badSimilarity.test(String(row.similarities||'')) &&
+    !badDifference.test(String(row.differences||'')) &&
+    !badVerdict.test(String(row.verdict||''))
   );
 }
 
@@ -214,7 +216,7 @@ async function fetchComparisons(query=''){
 
   // The public REST endpoint can cap a single response at 100 rows.
   // Page through it so the homepage can actually load the full 300-comparison target.
-  const targetRows=query?500:300;
+  const targetRows=500;
   const pageSize=100;
   const rows=[];
   for(let offset=0;offset<targetRows;offset+=pageSize){
@@ -281,7 +283,7 @@ async function fetchComparisons(query=''){
     return [...bestByBottle.values()].sort((a,b)=>Number(b.estimated_similarity)-Number(a.estimated_similarity));
   }
 
-  return queryWords.length ? websiteReady : rankHomepageComparisons(websiteReady);
+  return queryWords.length ? websiteReady : rankHomepageComparisons(websiteReady).slice(0,300);
 }
 
 async function fetchProfile(product){
