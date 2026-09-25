@@ -83,14 +83,20 @@ async function fetchComparisons(query=''){
   params.set('limit',query?200:80);
 
   const q=String(query||'').trim().replace(/[*,()%]/g,' ');
+  const queryWords=normalized(q).split(' ').filter(Boolean);
   if(q){
+    // Search the server with the first token (usually the brand), then require
+    // every typed token client-side. A full phrase like "Gucci Flora" should
+    // match brand=Gucci + name=Flora Gorgeous Orchid even though no single
+    // database column literally contains the phrase "Gucci Flora".
+    const serverTerm=queryWords[0] || q;
     const filter=[
-      'alternative_brand.ilike.*'+q+'*',
-      'alternative_name.ilike.*'+q+'*',
-      'original_brand.ilike.*'+q+'*',
-      'original_name.ilike.*'+q+'*',
-      'similarities.ilike.*'+q+'*',
-      'differences.ilike.*'+q+'*'
+      'alternative_brand.ilike.*'+serverTerm+'*',
+      'alternative_name.ilike.*'+serverTerm+'*',
+      'original_brand.ilike.*'+serverTerm+'*',
+      'original_name.ilike.*'+serverTerm+'*',
+      'similarities.ilike.*'+serverTerm+'*',
+      'differences.ilike.*'+serverTerm+'*'
     ].join(',');
     params.set('or','('+filter+')');
   }
@@ -104,6 +110,16 @@ async function fetchComparisons(query=''){
   const cleaned=rows.filter(row=>{
     const similarity=Number(row.estimated_similarity);
     if(!Number.isFinite(similarity) || similarity<60) return false;
+
+    if(queryWords.length){
+      const haystack=normalized([
+        row.alternative_brand,row.alternative_name,
+        row.original_brand,row.original_name,
+        row.similarities,row.differences
+      ].filter(Boolean).join(' '));
+      if(!queryWords.every(word=>haystack.includes(word))) return false;
+    }
+
     const key=[
       normalized(row.alternative_brand),normalized(row.alternative_name),
       normalized(row.original_brand),normalized(row.original_name)
@@ -118,7 +134,6 @@ async function fetchComparisons(query=''){
   // strongest comparison per original fragrance for single-word brand queries.
   // A more specific scent search such as "Gucci Bloom" still shows its different
   // verified alternatives so shoppers can compare options.
-  const queryWords=normalized(q).split(' ').filter(Boolean);
   if(queryWords.length===1){
     const exactBrand=cleaned.filter(row=>
       normalized(row.original_brand)===queryWords[0] ||
