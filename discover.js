@@ -67,6 +67,47 @@ function bottleSide(product,kicker){
   return side;
 }
 
+
+function comparisonCopyIsCustomerReady(row){
+  const bad=/(limited shared|independent comparison evidence|catalog currently|owner research|resolution file|database|machine|source-note|evidence links|research is still|not supplied)/i;
+  return Boolean(
+    row &&
+    row.compared_fragrance_id &&
+    safeHttpsUrl(row.original_image_url) &&
+    safeHttpsUrl(row.alternative_image_url) &&
+    String(row.similarities||'').trim() &&
+    String(row.differences||'').trim() &&
+    String(row.verdict||'').trim() &&
+    !bad.test(String(row.similarities||'')) &&
+    !bad.test(String(row.differences||'')) &&
+    !bad.test(String(row.verdict||''))
+  );
+}
+
+async function noteReadyIds(rows=[]){
+  const ids=[...new Set(rows.flatMap(row=>[row.fragrance_id,row.compared_fragrance_id]).filter(Boolean))];
+  const ready=new Set();
+  for(let offset=0;offset<ids.length;offset+=55){
+    const scope=ids.slice(offset,offset+55);
+    const params=new URLSearchParams();
+    params.set('select','id,top_notes,middle_notes,base_notes,fragrance_notes,accords');
+    params.set('id','in.('+scope.join(',')+')');
+    params.set('is_active','eq.true');
+    params.set('verification_status','eq.verified');
+    const response=await fetch(SMS_SUPABASE_URL+'/rest/v1/fragrances?'+params.toString(),{
+      headers:{apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY}
+    });
+    if(!response.ok) continue;
+    const products=await response.json();
+    for(const product of products){
+      const count=['top_notes','middle_notes','base_notes','fragrance_notes','accords']
+        .reduce((sum,key)=>sum+(Array.isArray(product[key])?product[key].filter(Boolean).length:0),0);
+      if(count>0) ready.add(product.id);
+    }
+  }
+  return ready;
+}
+
 async function fetchComparisons(query=''){
   const fields=[
     'comparison_id','fragrance_id','compared_fragrance_id','relationship',
@@ -129,17 +170,21 @@ async function fetchComparisons(query=''){
     return true;
   });
 
+  const copyReady=cleaned.filter(comparisonCopyIsCustomerReady);
+  const readyIds=await noteReadyIds(copyReady);
+  const websiteReady=copyReady.filter(row=>readyIds.has(row.fragrance_id)&&readyIds.has(row.compared_fragrance_id));
+
   // A broad brand search such as "Gucci" should browse the brand, not show
   // eight different alternatives for the same Gucci Bloom bottle. Keep one
   // strongest comparison per original fragrance for single-word brand queries.
   // A more specific scent search such as "Gucci Bloom" still shows its different
   // verified alternatives so shoppers can compare options.
   if(queryWords.length===1){
-    const exactBrand=cleaned.filter(row=>
+    const exactBrand=websiteReady.filter(row=>
       normalized(row.original_brand)===queryWords[0] ||
       normalized(row.alternative_brand)===queryWords[0]
     );
-    const source=exactBrand.length?exactBrand:cleaned;
+    const source=exactBrand.length?exactBrand:websiteReady;
     const bestByBottle=new Map();
     for(const row of source){
       const originalMatches=normalized(row.original_brand)===queryWords[0];
@@ -154,7 +199,7 @@ async function fetchComparisons(query=''){
     return [...bestByBottle.values()].sort((a,b)=>Number(b.estimated_similarity)-Number(a.estimated_similarity));
   }
 
-  return cleaned;
+  return websiteReady;
 }
 
 async function fetchProfile(product){
