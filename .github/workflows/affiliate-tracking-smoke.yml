@@ -1,0 +1,40 @@
+name: Affiliate tracking smoke check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/affiliate-tracking-smoke.yml"
+      - "index.html"
+      - "discover.js"
+  workflow_dispatch:
+
+jobs:
+  cj-tracking:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Verify live CJ website and app affiliate links
+        env:
+          CJ_URL: https://kdspdaffkbxxxgxlfnjo.supabase.co/functions/v1/cj-deals
+          SUPABASE_PUBLISHABLE_KEY: sb_publishable_KCHzj9dxjrN_Jzzo0b1weQ_7LktkdMB
+        run: |
+          set -euo pipefail
+          for channel in website app; do
+            curl --fail --silent --show-error --get "$CJ_URL"               -H "apikey: $SUPABASE_PUBLISHABLE_KEY"               -H "Accept: application/json"               --data-urlencode "q=Burberry Goddess Eau de Parfum"               --data-urlencode "channel=$channel"               -o "$channel.json"
+          done
+
+          node <<'NODE'
+          const fs=require('fs');
+          const expected={website:'101873859',app:'101873241'};
+          for(const channel of Object.keys(expected)){
+            const data=JSON.parse(fs.readFileSync(channel+'.json','utf8'));
+            if(data.success!==true) throw new Error(channel+' CJ response was not successful: '+JSON.stringify(data));
+            if(data.channel!==channel) throw new Error(channel+' response channel mismatch: '+data.channel);
+            if(String(data.publisherPid)!==expected[channel]) throw new Error(channel+' PID mismatch: '+data.publisherPid);
+            if(!Array.isArray(data.deals) || data.deals.length<1) throw new Error(channel+' returned no live CJ deals for smoke-test query');
+            const valid=data.deals.filter(d=>typeof d.affiliateUrl==='string' && /^https:\/\//.test(d.affiliateUrl));
+            if(valid.length<1) throw new Error(channel+' returned no valid CJ affiliate URLs');
+            console.log(channel+': OK, PID '+data.publisherPid+', '+valid.length+' affiliate URL(s)');
+          }
+          NODE
