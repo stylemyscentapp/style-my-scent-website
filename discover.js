@@ -67,7 +67,8 @@ async function loadStyleMyScentDiscovery(){
       const price=Number(row.price);
       const detail=`${row.concentration || 'Fragrance'}${Number.isFinite(price)?` • from $${price.toFixed(2)}`:''}`;
       copy.appendChild(textEl('p','',detail));
-      copy.appendChild(textEl('span','','Ready to style • verified shopping match'));\n      copy.appendChild(textEl('span','','Paid links • commissions may be earned'));
+      copy.appendChild(textEl('span','','Ready to style • verified shopping match'));
+      copy.appendChild(textEl('span','','Paid links • commissions may be earned'));
 
       const affiliateUrl=safeHttpsUrl(row.affiliate_url);
       if(affiliateUrl){
