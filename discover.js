@@ -189,10 +189,9 @@ async function fetchComparisons(query=''){
     'original_brand','original_name','original_concentration','original_image_url'
   ].join(',');
 
-  const params=new URLSearchParams();
-  params.set('select',fields);
-  params.set('order','verified_at.desc.nullslast,comparison_id');
-  params.set('limit',query?500:300);
+  const baseParams=new URLSearchParams();
+  baseParams.set('select',fields);
+  baseParams.set('order','verified_at.desc.nullslast,comparison_id');
 
   const q=String(query||'').trim().replace(/[*,()%]/g,' ');
   const queryWords=normalized(q).split(' ').filter(Boolean);
@@ -210,14 +209,26 @@ async function fetchComparisons(query=''){
       'similarities.ilike.*'+serverTerm+'*',
       'differences.ilike.*'+serverTerm+'*'
     ].join(',');
-    params.set('or','('+filter+')');
+    baseParams.set('or','('+filter+')');
   }
 
-  const response=await fetch(SMS_SUPABASE_URL+'/rest/v1/catalog_discover_comparison_cards_v1?'+params.toString(),{
-    headers:{apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY}
-  });
-  if(!response.ok) throw new Error('Discover unavailable');
-  const rows=await response.json();
+  // The public REST endpoint can cap a single response at 100 rows.
+  // Page through it so the homepage can actually load the full 300-comparison target.
+  const targetRows=query?500:300;
+  const pageSize=100;
+  const rows=[];
+  for(let offset=0;offset<targetRows;offset+=pageSize){
+    const params=new URLSearchParams(baseParams);
+    params.set('limit',String(pageSize));
+    params.set('offset',String(offset));
+    const response=await fetch(SMS_SUPABASE_URL+'/rest/v1/catalog_discover_comparison_cards_v1?'+params.toString(),{
+      headers:{apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY}
+    });
+    if(!response.ok) throw new Error('Discover unavailable');
+    const page=await response.json();
+    rows.push(...page);
+    if(page.length<pageSize) break;
+  }
   const seenPairs=new Set();
   const cleaned=rows.filter(row=>{
     const similarity=Number(row.estimated_similarity);
