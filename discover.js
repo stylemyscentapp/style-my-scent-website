@@ -31,6 +31,53 @@ function normalized(value=''){
   return String(value||'').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ');
 }
 
+const SMS_FAMILIAR_DESIGNER_BRANDS=new Set([
+  'creed','dior','chanel','gucci','givenchy','yves saint laurent','ysl','tom ford',
+  'parfums de marly','jean paul gaultier','mugler','rabanne','prada','valentino',
+  'giorgio armani','armani','maison francis kurkdjian','louis vuitton','burberry',
+  'carolina herrera','versace','dolce gabbana','dolce and gabbana','lancome',
+  'kayali','jimmy choo','chloe','marc jacobs'
+]);
+
+const SMS_FAMILIAR_ALT_BRANDS=new Set([
+  'lattafa','afnan','armaf','maison alhambra','french avenue','al haramain',
+  'orientica','fragrance world','paris corner','rayhaan','swiss arabian','ajmal'
+]);
+
+function familiarBrandScore(row){
+  let score=0;
+  if(SMS_FAMILIAR_DESIGNER_BRANDS.has(normalized(row.original_brand))) score+=8;
+  if(SMS_FAMILIAR_ALT_BRANDS.has(normalized(row.alternative_brand))) score+=5;
+  if(SMS_FAMILIAR_DESIGNER_BRANDS.has(normalized(row.alternative_brand))) score+=3;
+  if(SMS_FAMILIAR_ALT_BRANDS.has(normalized(row.original_brand))) score+=1;
+  score+=Math.min(5,Math.max(0,(Number(row.estimated_similarity)||60)-60)/8);
+  return score;
+}
+
+function rankHomepageComparisons(rows=[]){
+  const sorted=[...rows].sort((a,b)=>
+    familiarBrandScore(b)-familiarBrandScore(a) ||
+    Number(b.estimated_similarity||0)-Number(a.estimated_similarity||0) ||
+    String(b.verified_at||'').localeCompare(String(a.verified_at||''))
+  );
+
+  // Keep the first screen varied so one house does not dominate the homepage.
+  const first=[];
+  const rest=[];
+  const seenOriginalBrands=new Map();
+  for(const row of sorted){
+    const brand=normalized(row.original_brand);
+    const count=seenOriginalBrands.get(brand)||0;
+    if(first.length<12 && count<2){
+      first.push(row);
+      seenOriginalBrands.set(brand,count+1);
+    }else{
+      rest.push(row);
+    }
+  }
+  return [...first,...rest];
+}
+
 function productFromComparison(row,side){
   const alt=side==='alternative';
   return {
@@ -223,7 +270,7 @@ async function fetchComparisons(query=''){
     return [...bestByBottle.values()].sort((a,b)=>Number(b.estimated_similarity)-Number(a.estimated_similarity));
   }
 
-  return websiteReady;
+  return queryWords.length ? websiteReady : rankHomepageComparisons(websiteReady);
 }
 
 async function fetchProfile(product){
