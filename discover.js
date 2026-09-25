@@ -350,7 +350,7 @@ async function fetchAffiliateOffers(product){
   const q=[product.brand,product.name,product.concentration].filter(Boolean).join(' ').trim();
   if(!q) return [];
   try{
-    const response=await fetch(SMS_CJ_URL+'?q='+encodeURIComponent(q),{
+    const response=await fetch(SMS_CJ_URL+'?q='+encodeURIComponent(q)+'&channel=website',{
       headers:{apikey:SMS_SUPABASE_KEY,Accept:'application/json'}
     });
     if(!response.ok) return [];
