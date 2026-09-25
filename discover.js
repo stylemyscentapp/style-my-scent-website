@@ -89,20 +89,44 @@ async function noteReadyIds(rows=[]){
   const ready=new Set();
   for(let offset=0;offset<ids.length;offset+=55){
     const scope=ids.slice(offset,offset+55);
-    const params=new URLSearchParams();
-    params.set('select','id,top_notes,middle_notes,base_notes,fragrance_notes,accords');
-    params.set('id','in.('+scope.join(',')+')');
-    params.set('is_active','eq.true');
-    params.set('verification_status','eq.verified');
-    const response=await fetch(SMS_SUPABASE_URL+'/rest/v1/fragrances?'+params.toString(),{
-      headers:{apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY}
-    });
-    if(!response.ok) continue;
-    const products=await response.json();
-    for(const product of products){
-      const count=['top_notes','middle_notes','base_notes','fragrance_notes','accords']
-        .reduce((sum,key)=>sum+(Array.isArray(product[key])?product[key].filter(Boolean).length:0),0);
-      if(count>0) ready.add(product.id);
+    const idFilter='in.('+scope.join(',')+')';
+    const [coreRes,addisonRes,discoverRes]=await Promise.all([
+      fetch(SMS_SUPABASE_URL+'/rest/v1/fragrances?'+new URLSearchParams({
+        select:'id,top_notes,middle_notes,base_notes,fragrance_notes,accords',
+        id:idFilter,is_active:'eq.true',verification_status:'eq.verified'
+      }).toString(),{headers:{apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY}}),
+      fetch(SMS_SUPABASE_URL+'/rest/v1/catalog_addison_scent_profile?'+new URLSearchParams({
+        select:'fragrance_id,top_notes,middle_notes,base_notes,general_notes,accords',
+        fragrance_id:idFilter
+      }).toString(),{headers:{apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY}}),
+      fetch(SMS_SUPABASE_URL+'/rest/v1/catalog_discover_scent_profiles?'+new URLSearchParams({
+        select:'fragrance_id,notes,accords',
+        fragrance_id:idFilter
+      }).toString(),{headers:{apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY}})
+    ]);
+
+    if(coreRes.ok){
+      for(const product of await coreRes.json()){
+        const count=['top_notes','middle_notes','base_notes','fragrance_notes','accords']
+          .reduce((sum,key)=>sum+(Array.isArray(product[key])?product[key].filter(Boolean).length:0),0);
+        if(count>0) ready.add(product.id);
+      }
+    }
+    if(addisonRes.ok){
+      for(const profile of await addisonRes.json()){
+        const count=['top_notes','middle_notes','base_notes','general_notes','accords']
+          .reduce((sum,key)=>sum+(Array.isArray(profile[key])?profile[key].filter(Boolean).length:0),0);
+        if(count>0) ready.add(profile.fragrance_id);
+      }
+    }
+    if(discoverRes.ok){
+      for(const profile of await discoverRes.json()){
+        const notes=profile.notes||{};
+        const count=['top','heart','base','general']
+          .reduce((sum,key)=>sum+(Array.isArray(notes[key])?notes[key].filter(Boolean).length:0),0)
+          +(Array.isArray(profile.accords)?profile.accords.filter(Boolean).length:0);
+        if(count>0) ready.add(profile.fragrance_id);
+      }
     }
   }
   return ready;
@@ -121,7 +145,7 @@ async function fetchComparisons(query=''){
   const params=new URLSearchParams();
   params.set('select',fields);
   params.set('order','verified_at.desc.nullslast,comparison_id');
-  params.set('limit',query?200:80);
+  params.set('limit',query?500:300);
 
   const q=String(query||'').trim().replace(/[*,()%]/g,' ');
   const queryWords=normalized(q).split(' ').filter(Boolean);
@@ -204,19 +228,36 @@ async function fetchComparisons(query=''){
 
 async function fetchProfile(product){
   if(!product?.id) return null;
-  const params=new URLSearchParams({
+  const headers={apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY};
+  const coreParams=new URLSearchParams({
     select:'id,canonical_name,brand,concentration,product_type,top_notes,middle_notes,base_notes,fragrance_notes,accords,bottle_image_url',
-    id:'eq.'+product.id,
-    is_active:'eq.true',
-    verification_status:'eq.verified',
-    limit:'1'
+    id:'eq.'+product.id,is_active:'eq.true',verification_status:'eq.verified',limit:'1'
   });
-  const response=await fetch(SMS_SUPABASE_URL+'/rest/v1/fragrances?'+params.toString(),{
-    headers:{apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY}
+  const addisonParams=new URLSearchParams({
+    select:'fragrance_id,top_notes,middle_notes,base_notes,general_notes,accords',
+    fragrance_id:'eq.'+product.id,limit:'1'
   });
-  if(!response.ok) return null;
-  const row=(await response.json())[0];
+  const discoverParams=new URLSearchParams({
+    select:'fragrance_id,notes,accords',
+    fragrance_id:'eq.'+product.id,limit:'1'
+  });
+  const [coreRes,addisonRes,discoverRes]=await Promise.all([
+    fetch(SMS_SUPABASE_URL+'/rest/v1/fragrances?'+coreParams.toString(),{headers}),
+    fetch(SMS_SUPABASE_URL+'/rest/v1/catalog_addison_scent_profile?'+addisonParams.toString(),{headers}),
+    fetch(SMS_SUPABASE_URL+'/rest/v1/catalog_discover_scent_profiles?'+discoverParams.toString(),{headers})
+  ]);
+  if(!coreRes.ok) return null;
+  const row=(await coreRes.json())[0];
   if(!row) return null;
+  const addison=addisonRes.ok?(await addisonRes.json())[0]:null;
+  const discover=discoverRes.ok?(await discoverRes.json())[0]:null;
+  const dnotes=discover?.notes||{};
+  const pick=(...lists)=>{
+    for(const list of lists){
+      if(Array.isArray(list)&&list.filter(Boolean).length) return list.filter(Boolean);
+    }
+    return [];
+  };
   return {
     ...product,
     brand:row.brand||product.brand,
@@ -224,11 +265,11 @@ async function fetchProfile(product){
     concentration:row.concentration||row.product_type||product.concentration,
     imageUrl:row.bottle_image_url||product.imageUrl,
     notes:{
-      top:Array.isArray(row.top_notes)?row.top_notes.filter(Boolean):[],
-      heart:Array.isArray(row.middle_notes)?row.middle_notes.filter(Boolean):[],
-      base:Array.isArray(row.base_notes)?row.base_notes.filter(Boolean):[],
-      general:Array.isArray(row.fragrance_notes)?row.fragrance_notes.filter(Boolean):[],
-      accords:Array.isArray(row.accords)?row.accords.filter(Boolean):[],
+      top:pick(row.top_notes,addison?.top_notes,dnotes.top),
+      heart:pick(row.middle_notes,addison?.middle_notes,dnotes.heart),
+      base:pick(row.base_notes,addison?.base_notes,dnotes.base),
+      general:pick(row.fragrance_notes,addison?.general_notes,dnotes.general),
+      accords:pick(row.accords,addison?.accords,discover?.accords),
     }
   };
 }
