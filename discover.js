@@ -142,6 +142,46 @@ function comparisonCopyIsCustomerReady(row){
     !badVerdict.test(String(row.verdict||''))
   );
 }
+function addisonComparisonCopy(kind,value,row={}){
+  let text=String(value||'').replace(/\s+/g,' ').trim();
+  if(!text) return '';
+
+  if(kind==='same'){
+    text=text
+      .replace(/^Both profiles share (.+?), keeping the overall scent direction closely related\.?$/i,
+        (_,notes)=>`I get the strongest overlap from ${notes} — that’s what keeps these two in the same scent neighborhood.`)
+      .replace(/^Both profiles share (.+?)\.?$/i,
+        (_,notes)=>`The part that jumps out to me is ${notes}; that’s where these two feel most familiar.`);
+  }
+
+  if(kind==='different'){
+    text=text
+      .replace(/^The Middle Eastern fragrance emphasizes (.+?), while the designer reference emphasizes (.+?)\.?$/i,
+        (_,alt,orig)=>`I’d expect the alternative to lean more into ${alt}, while the original pulls harder toward ${orig}.`)
+      .replace(/^The source fragrance emphasizes (.+?), while the designer reference emphasizes (.+?)\.?$/i,
+        (_,alt,orig)=>`I’d expect the alternative to lean more into ${alt}, while the original pulls harder toward ${orig}.`)
+      .replace(/^The alternative emphasizes (.+?), while the original emphasizes (.+?)\.?$/i,
+        (_,alt,orig)=>`I’d expect the alternative to lean more into ${alt}, while the original pulls harder toward ${orig}.`);
+  }
+
+  if(kind==='verdict'){
+    if(/^A strong alternative with a clearly related profile/i.test(text)){
+      return 'I’d put this in the strong-alternative lane: familiar enough to scratch the same itch, but different enough to keep its own personality.';
+    }
+    if(/^A recognizable alternative that shares the same direction/i.test(text)){
+      return 'This is one I’d show you if you love the original but don’t need a one-for-one copy.';
+    }
+    if(/^Extremely close on paper/i.test(text)){
+      return 'This is one of the closer matches I’d put in front of you — the differences are more about nuance and wear than a totally different scent.';
+    }
+    if(/^A very close alternative/i.test(text)){
+      return 'I’d call this a very close alternative: the overall vibe stays familiar, while the finish still has its own character.';
+    }
+  }
+
+  return text;
+}
+
 
 async function noteReadyIds(rows=[]){
   const ids=[...new Set(rows.flatMap(row=>[row.fragrance_id,row.compared_fragrance_id]).filter(Boolean))];
@@ -446,16 +486,16 @@ function renderCompareCard(row,openDetail){
 
   const pair=document.createElement('div');
   pair.className='web-compare-pair';
-  pair.appendChild(bottleSide(productFromComparison(row,'original'),'ORIGINAL / DESIGNER'));
+  pair.appendChild(bottleSide(productFromComparison(row,'original'),'THE SCENT YOU KNOW'));
   pair.appendChild(textEl('div','web-compare-vs','↔'));
-  pair.appendChild(bottleSide(productFromComparison(row,'alternative'),'ALTERNATIVE'));
+  pair.appendChild(bottleSide(productFromComparison(row,'alternative'),'ONE TO TRY'));
   card.appendChild(pair);
 
   const similarity=Number(row.estimated_similarity);
   if(Number.isFinite(similarity)) card.appendChild(textEl('div','web-compare-score','≈ '+Math.round(similarity)+'% SIMILAR'));
 
-  const similarities=String(row.similarities||'').trim();
-  const differences=String(row.differences||'').trim();
+  const similarities=addisonComparisonCopy('same',row.similarities,row);
+  const differences=addisonComparisonCopy('different',row.differences,row);
   if(similarities){
     const p=document.createElement('p');
     p.className='web-compare-copy';
@@ -525,13 +565,13 @@ async function renderDetail(row,focusShop=''){
   const same=document.createElement('div');
   same.className='web-detail-card';
   same.appendChild(textEl('h3','','What feels the same'));
-  same.appendChild(textEl('p','',String(row.similarities||'These two scents move in a similar direction.')));
+  same.appendChild(textEl('p','',addisonComparisonCopy('same',row.similarities,row)||'These two land in a similar scent neighborhood, which is why I paired them.'));
   summary.appendChild(same);
 
   const diff=document.createElement('div');
   diff.className='web-detail-card';
   diff.appendChild(textEl('h3','','Where they split'));
-  diff.appendChild(textEl('p','',String(row.differences||'Each fragrance keeps its own character and wear.')));
+  diff.appendChild(textEl('p','',addisonComparisonCopy('different',row.differences,row)||'They still keep their own personality once you get into the details and drydown.'));
   summary.appendChild(diff);
 
   detail.appendChild(summary);
@@ -552,7 +592,7 @@ async function renderDetail(row,focusShop=''){
   addison.style.marginTop='16px';
   addison.appendChild(textEl('div','web-compare-kicker','ADDISON SAYS'));
   addison.appendChild(textEl('h3','','The quick take'));
-  addison.appendChild(textEl('p','',String(row.verdict||'Use the similarity as a shopping guide, then choose the bottle whose details fit your taste and budget.')));
+  addison.appendChild(textEl('p','',addisonComparisonCopy('verdict',row.verdict,row)||'I’d use the similarity as your shortcut, then pick the bottle whose details sound most like you.'));
   detail.appendChild(addison);
 
   const shops=document.createElement('div');
@@ -598,8 +638,8 @@ async function loadFullWebsiteDiscover(){
     grid.replaceChildren();
     state.rows.slice(0,state.visible).forEach(row=>grid.appendChild(renderCompareCard(row,renderDetail)));
     status.textContent=state.rows.length
-      ? state.rows.length+' comparison'+(state.rows.length===1?'':'s')+' found'
-      : (input.value.trim()?'I’m not seeing a match I’d feel good showing you yet. Try another spelling, bottle, or brand.':'No comparisons are ready right now.');
+      ? 'I found '+state.rows.length+' match'+(state.rows.length===1?'':'es')+' for you'
+      : (input.value.trim()?'I’m not seeing a match I’d feel good showing you yet. Try another spelling, bottle, or brand.':'I don’t have a match I want to put in front of you right now.');
     more.hidden=state.visible>=state.rows.length;
   };
 
