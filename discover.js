@@ -1,3 +1,13 @@
+(function purgeLegacyHeroDecor(){
+  const selectors='.scene-left,.scene-frame,.scene-shelf,.scene-items,.scene-bottle,.scene-candle,.scene-candle-body,.scene-wick,.scene-flame,.scene-candle-glow';
+  const style=document.createElement('style');
+  style.textContent=selectors+'{display:none!important}';
+  document.head.appendChild(style);
+  const purge=()=>document.querySelectorAll(selectors).forEach(node=>node.remove());
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',purge,{once:true});
+  else purge();
+})();
+
 const SMS_SUPABASE_URL='https://kdspdaffkbxxxgxlfnjo.supabase.co';
 const SMS_SUPABASE_KEY='sb_publishable_KCHzj9dxjrN_Jzzo0b1weQ_7LktkdMB';
 const SMS_AMAZON_TAG='stylemyscent-20';
