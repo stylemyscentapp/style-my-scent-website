@@ -22,6 +22,14 @@ function safeHttpsUrl(value=''){
   }
 }
 
+function safeBottleImageUrl(value=''){
+  const url=safeHttpsUrl(value);
+  if(!url) return '';
+  if(/\/ics\.png(?:[?#]|$)/i.test(url) || /placeholder/i.test(url)) return '';
+  if(/^https:\/\/(?:www\.)?alharamainperfumes\.co\.uk\/?$/i.test(url)) return '';
+  return url;
+}
+
 function textEl(tag,className,text){
   const el=document.createElement(tag);
   if(className) el.className=className;
@@ -103,7 +111,7 @@ function bottleSide(product,kicker){
   const side=document.createElement('div');
   side.className='web-compare-side';
 
-  const imageUrl=safeHttpsUrl(product.imageUrl);
+  const imageUrl=safeBottleImageUrl(product.imageUrl);
   if(imageUrl){
     const img=document.createElement('img');
     img.src=imageUrl;
