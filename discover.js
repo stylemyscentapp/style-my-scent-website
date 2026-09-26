@@ -23,9 +23,11 @@ function safeHttpsUrl(value=''){
 }
 
 function safeBottleImageUrl(value=''){
-  const url=safeHttpsUrl(value);
+  const raw=String(value || '').trim();
+  if(!raw || /[^\x00-\x7F]/.test(raw)) return '';
+  const url=safeHttpsUrl(raw);
   if(!url) return '';
-  if(/\/ics\.png(?:[?#]|$)/i.test(url) || /placeholder/i.test(url)) return '';
+  if(/\/ics\.png(?:[?#]|$)/i.test(url) || /placeholder|no[-_ ]?image|image[-_ ]?not[-_ ]?found/i.test(url)) return '';
   if(/^https:\/\/(?:www\.)?alharamainperfumes\.co\.uk\/?$/i.test(url)) return '';
   return url;
 }
@@ -136,15 +138,23 @@ function bottleSide(product,kicker){
 function comparisonCopyIsCustomerReady(row){
   const badSimilarity=/(limited shared|independent comparison evidence|catalog currently|owner research|resolution file|database|machine|source-note|evidence links|research is still|not supplied|owner-approved resolution|supplied snapshot)/i;
   const badDifference=/(owner research|resolution file|database|machine|source-note|evidence|not supplied|catalog currently)/i;
-  const badVerdict=/(OWNER_VERIFIED|owner-verified|human research|database|machine|resolution|still filling|still gathering|not enough|unsure)/i;
+  const badVerdict=/(OWNER[_ -]|owner-verified|human research|database|machine|resolution|corrected target|still filling|still gathering|not enough|unsure|research)/i;
   return Boolean(
     row &&
     row.compared_fragrance_id &&
-    safeHttpsUrl(row.original_image_url) &&
-    safeHttpsUrl(row.alternative_image_url) &&
+    row.fragrance_id !== row.compared_fragrance_id &&
+    safeBottleImageUrl(row.original_image_url) &&
+    safeBottleImageUrl(row.alternative_image_url) &&
+    !(
+      normalized(row.alternative_brand)===normalized(row.original_brand) &&
+      normalized(row.alternative_name)===normalized(row.original_name)
+    ) &&
     String(row.similarities||'').trim() &&
     String(row.differences||'').trim() &&
     String(row.verdict||'').trim() &&
+    !/^(?:n\/?a|unknown|none|not supplied|no data)\.?$/i.test(String(row.similarities||'').trim()) &&
+    !/^(?:n\/?a|unknown|none|not supplied|no data)(?:\s*\([^)]*\))?\.?$/i.test(String(row.differences||'').trim()) &&
+    !/^(?:n\/?a|unknown|none|not supplied|no data)\.?$/i.test(String(row.verdict||'').trim()) &&
     !badSimilarity.test(String(row.similarities||'')) &&
     !badDifference.test(String(row.differences||'')) &&
     !badVerdict.test(String(row.verdict||''))
