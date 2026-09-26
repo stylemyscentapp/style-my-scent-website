@@ -267,9 +267,7 @@ async function fetchComparisons(query=''){
       'alternative_brand.ilike.*'+serverTerm+'*',
       'alternative_name.ilike.*'+serverTerm+'*',
       'original_brand.ilike.*'+serverTerm+'*',
-      'original_name.ilike.*'+serverTerm+'*',
-      'similarities.ilike.*'+serverTerm+'*',
-      'differences.ilike.*'+serverTerm+'*'
+      'original_name.ilike.*'+serverTerm+'*'
     ].join(',');
     baseParams.set('or','('+filter+')');
   }
@@ -299,8 +297,7 @@ async function fetchComparisons(query=''){
     if(queryWords.length){
       const haystack=normalized([
         row.alternative_brand,row.alternative_name,
-        row.original_brand,row.original_name,
-        row.similarities,row.differences
+        row.original_brand,row.original_name
       ].filter(Boolean).join(' '));
       if(!queryWords.every(word=>haystack.includes(word))) return false;
     }
