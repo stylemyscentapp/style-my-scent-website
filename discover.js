@@ -260,7 +260,9 @@ async function fetchComparisons(query=''){
     // every typed token client-side. A full phrase like "Gucci Flora" should
     // match brand=Gucci + name=Flora Gorgeous Orchid even though no single
     // database column literally contains the phrase "Gucci Flora".
-    const serverTerm=[...queryWords].sort((a,b)=>b.length-a.length)[0] || q;
+    const genericTokens=new Set(['fragrance','fragrances','perfume','perfumes','parfum','parfums','inspired','world','eau','de','by','the']);
+    const specificWords=queryWords.filter(word=>!genericTokens.has(word));
+    const serverTerm=[...(specificWords.length?specificWords:queryWords)].sort((a,b)=>b.length-a.length)[0] || q;
     const filter=[
       'alternative_brand.ilike.*'+serverTerm+'*',
       'alternative_name.ilike.*'+serverTerm+'*',
