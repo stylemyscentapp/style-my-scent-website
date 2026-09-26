@@ -55,7 +55,7 @@ jobs:
               const specificWords=words.filter(word=>!genericTokens.has(word));
               const serverTerm=[...(specificWords.length?specificWords:words)].sort((a,b)=>b.length-a.length)[0];
               base.set('or','('+
-                ['alternative_brand','alternative_name','original_brand','original_name','similarities','differences']
+                ['alternative_brand','alternative_name','original_brand','original_name']
                   .map(col=>col+'.ilike.*'+serverTerm+'*').join(',')+
               ')');
             }
@@ -76,7 +76,7 @@ jobs:
               const sim=Number(row.estimated_similarity);
               if(!Number.isFinite(sim)||sim<60||sim>100) return false;
               if(words.length){
-                const hay=norm([row.alternative_brand,row.alternative_name,row.original_brand,row.original_name,row.similarities,row.differences].filter(Boolean).join(' '));
+                const hay=norm([row.alternative_brand,row.alternative_name,row.original_brand,row.original_name].filter(Boolean).join(' '));
                 if(!words.every(w=>hay.includes(w))) return false;
               }
               const pair=[norm(row.alternative_brand),norm(row.alternative_name),norm(row.original_brand),norm(row.original_name)].join('|');
