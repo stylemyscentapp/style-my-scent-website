@@ -1,0 +1,158 @@
+name: Website match regression
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "discover.js"
+      - "index.html"
+      - ".github/workflows/website-match-regression.yml"
+  workflow_dispatch:
+  schedule:
+    - cron: "17 11 * * *"
+
+jobs:
+  public-match-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify 300 launch-ready public matches and key searches
+        run: |
+          node <<'NODE'
+          const fs=require('fs');
+          const source=fs.readFileSync('discover.js','utf8');
+          const url=(source.match(/SMS_SUPABASE_URL='([^']+)'/)||[])[1];
+          const key=(source.match(/SMS_SUPABASE_KEY='([^']+)'/)||[])[1];
+          if(!url||!key) throw new Error('Could not read public Supabase config from discover.js');
+          const headers={apikey:key,Authorization:'Bearer '+key};
+
+          const norm=v=>String(v||'').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ');
+          const badSimilarity=/(limited shared|independent comparison evidence|catalog currently|owner research|resolution file|database|machine|source-note|evidence links|research is still|not supplied|owner-approved resolution|supplied snapshot)/i;
+          const badDifference=/(owner research|resolution file|database|machine|source-note|evidence|not supplied|catalog currently)/i;
+          const badVerdict=/(OWNER_VERIFIED|owner-verified|human research|database|machine|resolution|still filling|still gathering|not enough|unsure)/i;
+          const fields=[
+            'comparison_id','fragrance_id','compared_fragrance_id','relationship',
+            'estimated_similarity','shared_notes','similarities','differences','verdict',
+            'verified_at','alternative_brand','alternative_name','alternative_concentration','alternative_image_url',
+            'original_brand','original_name','original_concentration','original_image_url'
+          ].join(',');
+
+          async function get(path,params){
+            const res=await fetch(url+'/rest/v1/'+path+'?'+params.toString(),{headers});
+            if(!res.ok) throw new Error(path+' '+res.status+' '+await res.text());
+            return res.json();
+          }
+
+          async function rawComparisons(q=''){
+            const words=norm(q).split(' ').filter(Boolean);
+            const base=new URLSearchParams({select:fields,order:'verified_at.desc.nullslast,comparison_id'});
+            if(words.length){
+              const serverTerm=[...words].sort((a,b)=>b.length-a.length)[0];
+              base.set('or','('+
+                ['alternative_brand','alternative_name','original_brand','original_name','similarities','differences']
+                  .map(col=>col+'.ilike.*'+serverTerm+'*').join(',')+
+              ')');
+            }
+            const out=[];
+            for(let offset=0;offset<700;offset+=100){
+              const p=new URLSearchParams(base);
+              p.set('limit','100'); p.set('offset',String(offset));
+              const page=await get('catalog_discover_comparison_cards_v1',p);
+              out.push(...page);
+              if(page.length<100) break;
+            }
+            return {rows:out,words};
+          }
+
+          function clean({rows,words}){
+            const seen=new Set();
+            return rows.filter(row=>{
+              const sim=Number(row.estimated_similarity);
+              if(!Number.isFinite(sim)||sim<60||sim>100) return false;
+              if(words.length){
+                const hay=norm([row.alternative_brand,row.alternative_name,row.original_brand,row.original_name,row.similarities,row.differences].filter(Boolean).join(' '));
+                if(!words.every(w=>hay.includes(w))) return false;
+              }
+              const pair=[norm(row.alternative_brand),norm(row.alternative_name),norm(row.original_brand),norm(row.original_name)].join('|');
+              if(seen.has(pair)) return false;
+              seen.add(pair);
+              return true;
+            }).filter(row=>
+              row.compared_fragrance_id &&
+              /^https:\/\//.test(String(row.original_image_url||'')) &&
+              /^https:\/\//.test(String(row.alternative_image_url||'')) &&
+              String(row.similarities||'').trim() &&
+              String(row.differences||'').trim() &&
+              String(row.verdict||'').trim() &&
+              !badSimilarity.test(String(row.similarities||'')) &&
+              !badDifference.test(String(row.differences||'')) &&
+              !badVerdict.test(String(row.verdict||''))
+            );
+          }
+
+          const countArray=x=>Array.isArray(x)?x.filter(Boolean).length:0;
+          async function noteReadyIds(rows){
+            const ids=[...new Set(rows.flatMap(r=>[r.fragrance_id,r.compared_fragrance_id]).filter(Boolean))];
+            const ready=new Set();
+            for(let i=0;i<ids.length;i+=50){
+              const scope=ids.slice(i,i+50), idFilter='in.('+scope.join(',')+')';
+              const core=await get('fragrances',new URLSearchParams({
+                select:'id,top_notes,middle_notes,base_notes,fragrance_notes,accords',
+                id:idFilter,is_active:'eq.true',verification_status:'eq.verified'
+              }));
+              for(const x of core){
+                if(['top_notes','middle_notes','base_notes','fragrance_notes','accords'].reduce((n,k)=>n+countArray(x[k]),0)>0) ready.add(x.id);
+              }
+              const addison=await get('catalog_addison_scent_profile',new URLSearchParams({
+                select:'fragrance_id,top_notes,middle_notes,base_notes,general_notes,accords',fragrance_id:idFilter
+              }));
+              for(const x of addison){
+                if(['top_notes','middle_notes','base_notes','general_notes','accords'].reduce((n,k)=>n+countArray(x[k]),0)>0) ready.add(x.fragrance_id);
+              }
+              const discover=await get('catalog_discover_scent_profiles',new URLSearchParams({
+                select:'fragrance_id,notes,accords',fragrance_id:idFilter
+              }));
+              for(const x of discover){
+                const notes=x.notes||{};
+                const n=['top','heart','base','general'].reduce((sum,k)=>sum+countArray(notes[k]),0)+countArray(x.accords);
+                if(n>0) ready.add(x.fragrance_id);
+              }
+            }
+            return ready;
+          }
+
+          async function websiteReady(q=''){
+            const raw=await rawComparisons(q);
+            const copy=clean(raw);
+            const notes=await noteReadyIds(copy);
+            const rows=copy.filter(r=>notes.has(r.fragrance_id)&&notes.has(r.compared_fragrance_id));
+            if(raw.words.length){
+              const identity=rows.filter(r=>{
+                const h=norm([r.alternative_brand,r.alternative_name,r.original_brand,r.original_name].join(' '));
+                return raw.words.every(w=>h.includes(w));
+              });
+              return identity.length?identity:rows;
+            }
+            return rows;
+          }
+
+          const home=await websiteReady('');
+          if(home.length<300) throw new Error('Public website-ready match pool fell below 300: '+home.length);
+          console.log('Homepage pool: '+home.length+' website-ready matches');
+
+          const tests=[
+            ['9PM',r=>norm(r.alternative_brand)==='afnan'&&norm(r.alternative_name)==='9pm'&&norm(r.original_name).includes('ultra male')],
+            ['Armaf',r=>norm(r.alternative_brand)==='armaf'||norm(r.original_brand)==='armaf'],
+            ['Gucci Flora',r=>norm(r.original_brand)==='gucci'&&norm(r.original_name).includes('flora')],
+            ['Azzaro The Most Wanted',r=>(norm(r.original_brand)==='azzaro'||norm(r.alternative_brand)==='azzaro')&&norm(r.original_name+' '+r.alternative_name).includes('the most wanted')],
+            ['Lost Cherry',r=>norm(r.original_brand)==='tom ford'&&norm(r.original_name)==='lost cherry']
+          ];
+          for(const [q,predicate] of tests){
+            const rows=await websiteReady(q);
+            if(!rows.some(predicate)) throw new Error('Key search failed: '+q+' ('+rows.length+' rows)');
+            console.log(q+': OK ('+rows.length+' ready match'+(rows.length===1?'':'es')+')');
+          }
+          NODE
