@@ -316,17 +316,29 @@ async function fetchComparisons(query=''){
   const readyIds=await noteReadyIds(copyReady);
   const websiteReady=copyReady.filter(row=>readyIds.has(row.fragrance_id)&&readyIds.has(row.compared_fragrance_id));
 
+  // Search bottle identity first. If the typed words are actually present in a
+  // brand/name pair, do not let incidental wording in similarities/differences
+  // outrank or pollute those direct bottle matches.
+  const identityReady=queryWords.length
+    ? websiteReady.filter(row=>{
+        const identity=normalized([
+          row.alternative_brand,row.alternative_name,
+          row.original_brand,row.original_name
+        ].filter(Boolean).join(' '));
+        return queryWords.every(word=>identity.includes(word));
+      })
+    : [];
+  const searchReady=identityReady.length?identityReady:websiteReady;
+
   // A broad brand search such as "Gucci" should browse the brand, not show
-  // eight different alternatives for the same Gucci Bloom bottle. Keep one
-  // strongest comparison per original fragrance for single-word brand queries.
-  // A more specific scent search such as "Gucci Bloom" still shows its different
-  // verified alternatives so shoppers can compare options.
+  // eight different alternatives for the same bottle. Keep one strongest
+  // comparison per matching bottle.
   if(queryWords.length===1){
-    const exactBrand=websiteReady.filter(row=>
+    const exactBrand=searchReady.filter(row=>
       normalized(row.original_brand)===queryWords[0] ||
       normalized(row.alternative_brand)===queryWords[0]
     );
-    const source=exactBrand.length?exactBrand:websiteReady;
+    const source=exactBrand.length?exactBrand:searchReady;
     const bestByBottle=new Map();
     for(const row of source){
       const originalMatches=normalized(row.original_brand)===queryWords[0];
@@ -341,7 +353,14 @@ async function fetchComparisons(query=''){
     return [...bestByBottle.values()].sort((a,b)=>Number(b.estimated_similarity)-Number(a.estimated_similarity));
   }
 
-  return queryWords.length ? websiteReady : rankHomepageComparisons(websiteReady).slice(0,300);
+  if(queryWords.length){
+    return [...searchReady].sort((a,b)=>
+      Number(b.estimated_similarity||0)-Number(a.estimated_similarity||0) ||
+      String(b.verified_at||'').localeCompare(String(a.verified_at||''))
+    );
+  }
+
+  return rankHomepageComparisons(websiteReady).slice(0,300);
 }
 
 async function fetchProfile(product){
