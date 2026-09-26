@@ -480,7 +480,7 @@ async function renderShop(product,host){
   host.replaceChildren();
 
   if(offers.length){
-    host.appendChild(textEl('div','web-shop-status','Current partner offers for this exact bottle. The retailer has the final price and availability.'));
+    host.appendChild(textEl('div','web-shop-status','Current partner offers for '+String(product.name||'this bottle')+'. The retailer has the final price and availability.'));
     const byRetailer=new Map();
     for(const offer of offers){
       const key=normalized(offer.retailer||offer.advertiserId||'retailer');
@@ -508,7 +508,9 @@ async function renderShop(product,host){
   amazon.href=amazonUrl(product);
   amazon.target='_blank';
   amazon.rel='sponsored noopener noreferrer';
-  amazon.textContent='SEARCH AMAZON';
+  const amazonItemName=String(product.name||'THIS SCENT').trim();
+  amazon.textContent='SHOP '+amazonItemName.toUpperCase()+' ON AMAZON';
+  amazon.setAttribute('aria-label','Shop '+[product.brand,product.name].filter(Boolean).join(' ')+' on Amazon');
   host.appendChild(amazon);
 }
 
