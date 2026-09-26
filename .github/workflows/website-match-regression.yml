@@ -51,7 +51,9 @@ jobs:
             const words=norm(q).split(' ').filter(Boolean);
             const base=new URLSearchParams({select:fields,order:'verified_at.desc.nullslast,comparison_id'});
             if(words.length){
-              const serverTerm=[...words].sort((a,b)=>b.length-a.length)[0];
+              const genericTokens=new Set(['fragrance','fragrances','perfume','perfumes','parfum','parfums','inspired','world','eau','de','by','the']);
+              const specificWords=words.filter(word=>!genericTokens.has(word));
+              const serverTerm=[...(specificWords.length?specificWords:words)].sort((a,b)=>b.length-a.length)[0];
               base.set('or','('+
                 ['alternative_brand','alternative_name','original_brand','original_name','similarities','differences']
                   .map(col=>col+'.ilike.*'+serverTerm+'*').join(',')+
