@@ -418,7 +418,7 @@ async function renderShop(product,host){
       host.appendChild(row);
     });
   }else{
-    host.appendChild(textEl('div','web-shop-status','No exact CJ partner offer is verified right now. You can still search Amazon through our tagged link.'));
+    host.appendChild(textEl('div','web-shop-status','I don’t have a clean partner match for this exact bottle right now, but you can still check Amazon through our tagged link.'));
   }
 
   const amazon=document.createElement('a');
@@ -588,15 +588,15 @@ async function loadFullWebsiteDiscover(){
     grid.replaceChildren();
     state.rows.slice(0,state.visible).forEach(row=>grid.appendChild(renderCompareCard(row,renderDetail)));
     status.textContent=state.rows.length
-      ? state.rows.length+' verified comparison'+(state.rows.length===1?'':'s')+' found'
-      : (input.value.trim()?'No verified match yet. Try another spelling, bottle, or brand.':'No comparisons are ready right now.');
+      ? state.rows.length+' comparison'+(state.rows.length===1?'':'s')+' found'
+      : (input.value.trim()?'I’m not seeing a match I’d feel good showing you yet. Try another spelling, bottle, or brand.':'No comparisons are ready right now.');
     more.hidden=state.visible>=state.rows.length;
   };
 
   const refresh=async()=>{
     const request=++state.request;
     const q=input.value.trim();
-    status.textContent='Finding verified comparisons…';
+    status.textContent='Addison is pulling your closest matches…';
     try{
       const rows=await fetchComparisons(q);
       if(request!==state.request) return;
@@ -674,7 +674,7 @@ async function loadStyleMyScentDiscovery(){
       const price=Number(row.price);
       const detail=(row.concentration || 'Fragrance')+(Number.isFinite(price)?' • from $'+price.toFixed(2):'');
       copy.appendChild(textEl('p','',detail));
-      copy.appendChild(textEl('span','','Ready to style • verified shopping match'));
+      copy.appendChild(textEl('span','','Ready to style • shop this match'));
       copy.appendChild(textEl('span','','Paid links • commissions may be earned'));
 
       const affiliateUrl=safeHttpsUrl(row.affiliate_url);
