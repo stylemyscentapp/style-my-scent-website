@@ -273,8 +273,8 @@ async function fetchComparisons(query=''){
   }
 
   // The public REST endpoint can cap a single response at 100 rows.
-  // Page through it so the homepage can actually load the full 300-comparison target.
-  const targetRows=500;
+  // Scan enough verified public rows to keep the full 300 customer-ready comparison target filled.
+  const targetRows=700;
   const pageSize=100;
   const rows=[];
   for(let offset=0;offset<targetRows;offset+=pageSize){
