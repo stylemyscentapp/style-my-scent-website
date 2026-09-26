@@ -663,6 +663,7 @@ async function loadFullWebsiteDiscover(){
   const grid=document.getElementById('website-discover-grid');
   const status=document.getElementById('website-discover-status');
   const more=document.getElementById('website-discover-more');
+  const example=document.getElementById('website-discover-example');
   if(!input||!grid||!status||!more) return;
 
   const state={rows:[],visible:8,request:0};
@@ -680,6 +681,7 @@ async function loadFullWebsiteDiscover(){
   const refresh=async()=>{
     const request=++state.request;
     const q=input.value.trim();
+    more.hidden=true;
     status.textContent='Addison is pulling your closest matches…';
     try{
       const rows=await fetchComparisons(q);
@@ -704,6 +706,14 @@ async function loadFullWebsiteDiscover(){
     state.visible+=8;
     paint();
   });
+
+  if(example){
+    example.addEventListener('click',async()=>{
+      input.value='9PM';
+      await refresh();
+      grid.scrollIntoView({behavior:'smooth',block:'start'});
+    });
+  }
 
   await refresh();
 }
