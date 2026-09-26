@@ -201,7 +201,7 @@ function addisonComparisonCopy(kind,value,row={}){
 }
 
 
-async function noteReadyIds(rows=[]){
+async function noteReadyIds(rows=[],signal){
   const ids=[...new Set(rows.flatMap(row=>[row.fragrance_id,row.compared_fragrance_id]).filter(Boolean))];
   const ready=new Set();
   for(let offset=0;offset<ids.length;offset+=55){
@@ -211,15 +211,15 @@ async function noteReadyIds(rows=[]){
       fetch(SMS_SUPABASE_URL+'/rest/v1/fragrances?'+new URLSearchParams({
         select:'id,top_notes,middle_notes,base_notes,fragrance_notes,accords',
         id:idFilter,is_active:'eq.true',verification_status:'eq.verified'
-      }).toString(),{headers:{apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY}}),
+      }).toString(),{headers:{apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY},signal}),
       fetch(SMS_SUPABASE_URL+'/rest/v1/catalog_addison_scent_profile?'+new URLSearchParams({
         select:'fragrance_id,top_notes,middle_notes,base_notes,general_notes,accords',
         fragrance_id:idFilter
-      }).toString(),{headers:{apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY}}),
+      }).toString(),{headers:{apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY},signal}),
       fetch(SMS_SUPABASE_URL+'/rest/v1/catalog_discover_scent_profiles?'+new URLSearchParams({
         select:'fragrance_id,notes,accords',
         fragrance_id:idFilter
-      }).toString(),{headers:{apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY}})
+      }).toString(),{headers:{apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY},signal})
     ]);
 
     if(coreRes.ok){
@@ -249,7 +249,7 @@ async function noteReadyIds(rows=[]){
   return ready;
 }
 
-async function fetchComparisons(query=''){
+async function fetchComparisons(query='',signal){
   const fields=[
     'comparison_id','fragrance_id','compared_fragrance_id','relationship',
     'estimated_similarity','shared_notes','similarities','differences','verdict',
@@ -292,7 +292,7 @@ async function fetchComparisons(query=''){
     params.set('limit',String(pageSize));
     params.set('offset',String(offset));
     const response=await fetch(SMS_SUPABASE_URL+'/rest/v1/catalog_discover_comparison_cards_v1?'+params.toString(),{
-      headers:{apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY}
+      headers:{apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY},signal
     });
     if(!response.ok) throw new Error('Discover unavailable');
     const page=await response.json();
@@ -322,7 +322,7 @@ async function fetchComparisons(query=''){
   });
 
   const copyReady=cleaned.filter(comparisonCopyIsCustomerReady);
-  const readyIds=await noteReadyIds(copyReady);
+  const readyIds=await noteReadyIds(copyReady,signal);
   const websiteReady=copyReady.filter(row=>readyIds.has(row.fragrance_id)&&readyIds.has(row.compared_fragrance_id));
 
   // Search bottle identity first. If the typed words are actually present in a
@@ -658,6 +658,29 @@ async function renderDetail(row,focusShop=''){
   });
 }
 
+function renderCompareCardFallback(row,openDetail){
+  const card=document.createElement('article');
+  card.className='web-compare-card';
+  const original=productFromComparison(row,'original');
+  const alternative=productFromComparison(row,'alternative');
+  const similarity=Number(row.estimated_similarity);
+
+  card.appendChild(textEl('div','web-compare-kicker','SCENT MATCH'));
+  card.appendChild(textEl('h3','web-detail-title',
+    [original.brand,original.name,'↔',alternative.brand,alternative.name].filter(Boolean).join(' ')
+  ));
+  if(Number.isFinite(similarity)){
+    card.appendChild(textEl('div','web-compare-score','≈ '+Math.round(similarity)+'% SIMILAR'));
+  }
+  const actions=document.createElement('div');
+  actions.className='web-compare-actions';
+  const view=buttonEl('SEE MATCH DETAILS');
+  view.addEventListener('click',()=>openDetail(row));
+  actions.appendChild(view);
+  card.appendChild(actions);
+  return card;
+}
+
 async function loadFullWebsiteDiscover(){
   const input=document.getElementById('website-discover-search');
   const grid=document.getElementById('website-discover-grid');
@@ -666,13 +689,25 @@ async function loadFullWebsiteDiscover(){
   const example=document.getElementById('website-discover-example');
   if(!input||!grid||!status||!more) return;
 
-  const state={rows:[],visible:8,request:0};
+  const state={rows:[],visible:8,request:0,controller:null};
   window.__smsDiscoverState=state;
 
   const paint=()=>{
     grid.replaceChildren();
-    state.rows.slice(0,state.visible).forEach(row=>grid.appendChild(renderCompareCard(row,renderDetail)));
-    status.textContent=state.rows.length
+    let rendered=0;
+    for(const row of state.rows.slice(0,state.visible)){
+      try{
+        grid.appendChild(renderCompareCard(row,renderDetail));
+        rendered+=1;
+      }catch(error){
+        console.warn('Style My Scent card render fallback',error);
+        try{
+          grid.appendChild(renderCompareCardFallback(row,renderDetail));
+          rendered+=1;
+        }catch{}
+      }
+    }
+    status.textContent=rendered
       ? 'I found '+state.rows.length+' match'+(state.rows.length===1?'':'es')+' for you'
       : (input.value.trim()?'I’m not seeing a match I’d feel good showing you yet. Try another spelling, bottle, or brand.':'I don’t have a match I want to put in front of you right now.');
     more.hidden=state.visible>=state.rows.length;
@@ -681,19 +716,38 @@ async function loadFullWebsiteDiscover(){
   const refresh=async()=>{
     const request=++state.request;
     const q=input.value.trim();
+    if(state.controller) state.controller.abort();
+    const controller=new AbortController();
+    state.controller=controller;
     more.hidden=true;
     status.textContent='Addison is pulling your closest matches…';
-    try{
-      const rows=await fetchComparisons(q);
-      if(request!==state.request) return;
+
+    const applyRows=(rows)=>{
+      if(request!==state.request) return false;
       state.rows=rows;
       state.visible=8;
       paint();
-    }catch{
-      if(request!==state.request) return;
-      state.rows=[];
-      paint();
-      status.textContent='Discover is refreshing. Please try again in a moment.';
+      return true;
+    };
+
+    try{
+      const rows=await fetchComparisons(q,controller.signal);
+      applyRows(rows);
+    }catch(error){
+      if(error?.name==='AbortError' || request!==state.request) return;
+      console.warn('Style My Scent discover retry',error);
+      try{
+        await new Promise(resolve=>setTimeout(resolve,180));
+        if(controller.signal.aborted || request!==state.request) return;
+        const rows=await fetchComparisons(q,controller.signal);
+        applyRows(rows);
+      }catch(retryError){
+        if(retryError?.name==='AbortError' || request!==state.request) return;
+        console.error('Style My Scent discover failed',retryError);
+        state.rows=[];
+        paint();
+        status.textContent='I couldn’t load matches just now. Please try the search again.';
+      }
     }
   };
 
