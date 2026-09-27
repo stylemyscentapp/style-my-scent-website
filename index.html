@@ -38,12 +38,12 @@ footer{border-top:1px solid var(--line);padding:38px 0 48px;color:#9f9589;font-s
 .web-discover-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
 .web-compare-card{border:1px solid var(--line);border-radius:24px;background:#11100e;padding:22px;display:flex;flex-direction:column;gap:16px;min-width:0}
 .web-compare-pair{display:grid;grid-template-columns:minmax(0,1fr) 52px minmax(0,1fr);align-items:center;gap:10px}
-.web-compare-side{text-align:center;min-width:0}
+.web-compare-side{text-align:center;min-width:0}.web-compare-side.is-shop-link{cursor:pointer;border-radius:16px;padding:4px;transition:transform .16s ease,background .16s ease}.web-compare-side.is-shop-link:hover,.web-compare-side.is-shop-link:focus-visible{transform:translateY(-2px);background:rgba(241,212,154,.045);outline:1px solid rgba(241,212,154,.25)}.web-compare-side.is-shop-link img{transition:transform .16s ease}.web-compare-side.is-shop-link:hover img,.web-compare-side.is-shop-link:focus-visible img{transform:scale(1.025)}
 .web-compare-side img{width:100%;height:150px;object-fit:contain;display:block;background:transparent}
 .web-compare-side .fallback{height:150px;border:1px solid rgba(241,212,154,.22);border-radius:16px;display:flex;align-items:center;justify-content:center;color:var(--gold2);font:700 26px "Cormorant Garamond",serif;background:#0c0b09}
 .web-compare-kicker{font-size:9px;letter-spacing:.14em;color:var(--gold2);font-weight:800;margin-top:8px}
 .web-compare-name{font:600 22px/1.04 "Cormorant Garamond",serif;color:var(--cream);margin-top:4px;overflow-wrap:anywhere}
-.web-compare-brand{font-size:10px;letter-spacing:.08em;color:var(--muted);margin-top:5px}
+.web-compare-brand{font-size:10px;letter-spacing:.08em;color:var(--muted);margin-top:5px}.web-compare-notes{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 7px;margin:10px auto 0;min-height:22px;max-width:240px}.web-note-chip{display:inline-flex;align-items:center;border:1px solid rgba(241,212,154,.2);border-radius:999px;padding:4px 8px;background:rgba(241,212,154,.055);color:#dfd3c3;font-size:9px;line-height:1.2;letter-spacing:.02em}
 .web-compare-vs{text-align:center;color:var(--gold);font-size:24px}
 .web-compare-score{font-size:13px;letter-spacing:.08em;font-weight:800;color:var(--gold2);text-align:center}
 .web-compare-copy{font-size:13px;line-height:1.6;color:#e5dacd;margin:0}
@@ -53,7 +53,7 @@ footer{border-top:1px solid var(--line);padding:38px 0 48px;color:#9f9589;font-s
 .web-discover-btn.secondary{border-color:var(--line);color:#eadfce}
 .web-discover-btn:hover{border-color:var(--gold2);color:#fff0c7}
 .web-discover-more{display:block;margin:18px auto 0;border:1px solid var(--gold);border-radius:999px;background:#17130f;color:var(--gold2);padding:11px 20px;font-size:11px;font-weight:800;letter-spacing:.08em;cursor:pointer}
-.web-discover-detail{margin-top:26px;border:1px solid var(--line);border-radius:26px;background:linear-gradient(145deg,#17130f,#0e0c0a);padding:28px}
+.web-discover-detail{margin-top:26px;border:1px solid var(--line);border-radius:26px;background:linear-gradient(145deg,#17130f,#0e0c0a);padding:28px}.web-detail-notes-card{text-align:center}.web-detail-bottle{width:100%;height:190px;object-fit:contain;display:block;margin:0 auto 18px}.web-detail-notes-card .web-note-stage{text-align:left;margin-top:14px;padding-top:12px;border-top:1px solid rgba(241,212,154,.12)}
 .web-detail-back{appearance:none;border:0;background:transparent;color:var(--gold2);font-size:13px;cursor:pointer;padding:0 0 16px}
 .web-detail-title{font:600 clamp(34px,4vw,48px)/1.02 "Cormorant Garamond",serif;margin:0 0 8px}
 .web-detail-sub{color:var(--muted);margin:0 0 24px;line-height:1.6}
