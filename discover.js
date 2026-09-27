@@ -74,8 +74,21 @@ function familiarBrandScore(row){
   return score;
 }
 
+function homepageDesignerTier(row){
+  const originalDesigner=SMS_FAMILIAR_DESIGNER_BRANDS.has(normalized(row.original_brand));
+  const alternativeDesigner=SMS_FAMILIAR_DESIGNER_BRANDS.has(normalized(row.alternative_brand));
+  const originalAlt=SMS_FAMILIAR_ALT_BRANDS.has(normalized(row.original_brand));
+  const alternativeAlt=SMS_FAMILIAR_ALT_BRANDS.has(normalized(row.alternative_brand));
+  if(originalDesigner && alternativeAlt) return 4;
+  if(originalDesigner) return 3;
+  if(alternativeDesigner && originalAlt) return 2;
+  if(alternativeDesigner) return 1;
+  return 0;
+}
+
 function rankHomepageComparisons(rows=[]){
   const sorted=[...rows].sort((a,b)=>
+    homepageDesignerTier(b)-homepageDesignerTier(a) ||
     familiarBrandScore(b)-familiarBrandScore(a) ||
     Number(b.estimated_similarity||0)-Number(a.estimated_similarity||0) ||
     String(b.verified_at||'').localeCompare(String(a.verified_at||''))
@@ -109,9 +122,10 @@ function productFromComparison(row,side){
   };
 }
 
-function bottleSide(product,kicker){
+function bottleSide(product,kicker,onShop){
   const side=document.createElement('div');
-  side.className='web-compare-side';
+  side.className='web-compare-side'+(onShop?' is-shop-link':'');
+  if(product?.id) side.dataset.fragranceId=product.id;
 
   const imageUrl=safeBottleImageUrl(product.imageUrl);
   if(imageUrl){
@@ -131,6 +145,25 @@ function bottleSide(product,kicker){
   side.appendChild(textEl('div','web-compare-kicker',kicker));
   side.appendChild(textEl('div','web-compare-name',product.name||'Fragrance'));
   side.appendChild(textEl('div','web-compare-brand',product.brand||''));
+
+  const noteHost=document.createElement('div');
+  noteHost.className='web-compare-notes';
+  if(product?.id) noteHost.dataset.fragranceId=product.id;
+  side.appendChild(noteHost);
+
+  if(onShop){
+    side.tabIndex=0;
+    side.setAttribute('role','button');
+    side.setAttribute('aria-label','Shop '+[product.brand,product.name].filter(Boolean).join(' '));
+    side.title='Shop '+[product.brand,product.name].filter(Boolean).join(' ');
+    side.addEventListener('click',onShop);
+    side.addEventListener('keydown',event=>{
+      if(event.key==='Enter' || event.key===' '){
+        event.preventDefault();
+        onShop();
+      }
+    });
+  }
   return side;
 }
 
@@ -372,6 +405,45 @@ async function fetchComparisons(query='',signal){
   return rankHomepageComparisons(websiteReady).slice(0,300);
 }
 
+const SMS_COMPACT_PROFILE_CACHE=new Map();
+
+function compactProfileNotes(row={}){
+  const staged=[
+    ...(Array.isArray(row.top_notes)?row.top_notes:[]),
+    ...(Array.isArray(row.middle_notes)?row.middle_notes:[]),
+    ...(Array.isArray(row.base_notes)?row.base_notes:[])
+  ].filter(Boolean);
+  const general=(Array.isArray(row.fragrance_notes)?row.fragrance_notes:[]).filter(Boolean);
+  const accords=(Array.isArray(row.accords)?row.accords:[]).filter(Boolean);
+  return [...new Set(staged.length?staged:(general.length?general:accords))].slice(0,4);
+}
+
+async function hydrateCompactNotes(rows=[]){
+  const ids=[...new Set(rows.flatMap(row=>[row.fragrance_id,row.compared_fragrance_id]).filter(Boolean))];
+  const missing=ids.filter(id=>!SMS_COMPACT_PROFILE_CACHE.has(id));
+  const headers={apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY};
+
+  for(let offset=0;offset<missing.length;offset+=50){
+    const scope=missing.slice(offset,offset+50);
+    if(!scope.length) continue;
+    try{
+      const params=new URLSearchParams({
+        select:'id,top_notes,middle_notes,base_notes,fragrance_notes,accords',
+        id:'in.('+scope.join(',')+')'
+      });
+      const response=await fetch(SMS_SUPABASE_URL+'/rest/v1/fragrances?'+params.toString(),{headers});
+      if(!response.ok) continue;
+      for(const row of await response.json()) SMS_COMPACT_PROFILE_CACHE.set(row.id,compactProfileNotes(row));
+    }catch{}
+  }
+
+  document.querySelectorAll('.web-compare-notes[data-fragrance-id]').forEach(host=>{
+    const notes=SMS_COMPACT_PROFILE_CACHE.get(host.dataset.fragranceId)||[];
+    host.replaceChildren();
+    notes.forEach(note=>host.appendChild(textEl('span','web-note-chip',note)));
+  });
+}
+
 async function fetchProfile(product){
   if(!product?.id) return null;
   const headers={apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY};
@@ -422,7 +494,19 @@ async function fetchProfile(product){
 
 function notesCard(product,label){
   const card=document.createElement('div');
-  card.className='web-detail-card';
+  card.className='web-detail-card web-detail-notes-card';
+
+  const imageUrl=safeBottleImageUrl(product?.imageUrl);
+  if(imageUrl){
+    const img=document.createElement('img');
+    img.className='web-detail-bottle';
+    img.src=imageUrl;
+    img.alt=[product.brand,product.name,'bottle'].filter(Boolean).join(' ');
+    img.loading='lazy';
+    img.referrerPolicy='no-referrer';
+    card.appendChild(img);
+  }
+
   card.appendChild(textEl('div','web-compare-kicker',label));
   card.appendChild(textEl('h3','',[product.brand,product.name].filter(Boolean).join(' ')));
   if(product.concentration) card.appendChild(textEl('p','',product.concentration));
@@ -520,9 +604,12 @@ function renderCompareCard(row,openDetail){
 
   const pair=document.createElement('div');
   pair.className='web-compare-pair';
-  pair.appendChild(bottleSide(productFromComparison(row,'original'),'THE SCENT YOU KNOW'));
+  const originalProduct=productFromComparison(row,'original');
+  const alternativeProduct=productFromComparison(row,'alternative');
+  const originalKicker=SMS_FAMILIAR_DESIGNER_BRANDS.has(normalized(originalProduct.brand))?'DESIGNER SCENT':'THE SCENT YOU KNOW';
+  pair.appendChild(bottleSide(originalProduct,originalKicker,()=>openDetail(row,'original')));
   pair.appendChild(textEl('div','web-compare-vs','↔'));
-  pair.appendChild(bottleSide(productFromComparison(row,'alternative'),'ONE TO TRY'));
+  pair.appendChild(bottleSide(alternativeProduct,'ONE TO TRY',()=>openDetail(row,'alternative')));
   card.appendChild(pair);
 
   const similarity=Number(row.estimated_similarity);
@@ -707,6 +794,7 @@ async function loadFullWebsiteDiscover(){
         }catch{}
       }
     }
+    hydrateCompactNotes(state.rows.slice(0,state.visible));
     status.textContent=rendered
       ? 'I found '+state.rows.length+' match'+(state.rows.length===1?'':'es')+' for you'
       : (input.value.trim()?'I’m not seeing a match I’d feel good showing you yet. Try another spelling, bottle, or brand.':'I don’t have a match I want to put in front of you right now.');
