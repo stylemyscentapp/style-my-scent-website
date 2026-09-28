@@ -287,6 +287,46 @@ function addisonComparisonCopy(kind,value,row={}){
   return technical.test(copy)?'':copy;
 }
 
+async function fetchPublicWearDetails(comparisonId){
+  if(!comparisonId) return null;
+  try{
+    const params=new URLSearchParams({
+      select:'comparison_id,opening_comparison,drydown_comparison,performance_comparison',
+      comparison_id:'eq.'+comparisonId,
+      limit:'1'
+    });
+    const response=await fetch(SMS_SUPABASE_URL+'/rest/v1/catalog_public_comparison_wear_v1?'+params.toString(),{
+      headers:{apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY}
+    });
+    if(!response.ok) return null;
+    return (await response.json())[0]||null;
+  }catch{return null}
+}
+
+function addisonWearCopy(kind,value,row={}){
+  let t=String(value||'').replace(/\s+/g,' ').trim();
+  if(!t || /^No separate .* was reported\.?$/i.test(t)) return '';
+  const technical=/(owner[- ]?(approved|verified|research)|human research|workbook|csv|database|machine|evidence|source[- ]reported|pipeline|publication|percentage was reported)/i;
+  if(technical.test(t)) return '';
+  const alt=String(row.alternative_name||'the alternative').trim();
+  const original=String(row.original_name||'the designer').trim();
+
+  if(kind==='opening'){
+    return t
+      .replace(/^Both openings meet around (.+?)\.?$/i,(_,notes)=>`They meet quickly around ${notes}, so the first impression stays familiar.`)
+      .replace(/^The openings separate more clearly.*$/i,`The opening is where ${alt} shows more of its own personality, while ${original} keeps the designer signature more clearly.`);
+  }
+  if(kind==='drydown'){
+    return t
+      .replace(/^Both drydowns meet around (.+?)\.?$/i,(_,notes)=>`They settle into the same ${notes} direction, which keeps the finish familiar on skin.`)
+      .replace(/^The drydowns separate more clearly than the opening, with different base-note emphasis\.?$/i,`This is where they part ways most: ${alt} shifts into a different base-note balance while ${original} keeps the original designer finish.`);
+  }
+  if(kind==='performance'){
+    return t.replace(/^Performance is broadly similar\.?$/i,'Performance stays in a similar lane, so the bigger decision is scent character rather than wear time.');
+  }
+  return t;
+}
+
 async function noteReadyIds(rows=[],signal){
   const ids=[...new Set(rows.flatMap(row=>[row.fragrance_id,row.compared_fragrance_id]).filter(Boolean))];
   const ready=new Set();
@@ -595,7 +635,7 @@ async function fetchAffiliateOffers(product){
     const brandTokens=normalized(product.brand).split(' ').filter(x=>x.length>2);
     return (data.deals||[]).filter(deal=>{
       const hay=normalized((deal.title||'')+' '+(deal.description||''));
-      return nameTokens.every(t=>hay.includes(t)) && brandTokens.every(t=>hay.includes(t)) && safeHttpsUrl(deal.affiliateUrl);
+      return nameTokens.every(t=>hay.includes(t)) && brandTokens.every(t=>hay.includes(t)) && deal.saleVariant==='Retail bottle' && safeHttpsUrl(deal.affiliateUrl);
     }).sort((a,b)=>Number(a.price||0)-Number(b.price||0));
   }catch{
     return [];
@@ -617,19 +657,21 @@ async function renderShop(product,host){
   host.replaceChildren();
 
   if(offers.length){
-    host.appendChild(textEl('div','web-shop-status','Current partner offers for '+String(product.name||'this bottle')+'. The retailer has the final price and availability.'));
     const byRetailer=new Map();
     for(const offer of offers){
       const key=normalized(offer.retailer||offer.advertiserId||'retailer');
-      if(!byRetailer.has(key)) byRetailer.set(key,offer);
+      const existing=byRetailer.get(key);
+      if(!existing || Number(offer.price)<Number(existing.price)) byRetailer.set(key,offer);
     }
+    const liveRetailers=[...byRetailer.values()].map(x=>String(x.retailer||'partner'));
+    host.appendChild(textEl('div','web-shop-status','I found a live retail-bottle match'+(liveRetailers.length?' at '+liveRetailers.join(' + '):'')+'. If one partner sells out, I keep the next available partner here and leave Amazon as the fallback.'));
     [...byRetailer.values()].slice(0,4).forEach(offer=>{
       const row=document.createElement('div');
       row.className='web-shop-offer';
       const a=document.createElement('a');
       a.href=safeHttpsUrl(offer.affiliateUrl);
       a.target='_blank';
-      a.rel='sponsored noopener noreferrer';
+      a.rel='sponsored nofollow noopener noreferrer';
       a.textContent='SHOP AT '+String(offer.retailer||'PARTNER').toUpperCase();
       row.appendChild(a);
       const price=Number(offer.price);
@@ -637,14 +679,14 @@ async function renderShop(product,host){
       host.appendChild(row);
     });
   }else{
-    host.appendChild(textEl('div','web-shop-status','I don’t have a clean partner match for this exact bottle right now, but you can still check Amazon through our tagged link.'));
+    host.appendChild(textEl('div','web-shop-status','My priority partners do not have a clean live match for this exact retail bottle right now, so I’m falling back to Amazon instead of sending you to a dead listing.'));
   }
 
   const amazon=document.createElement('a');
   amazon.className='web-discover-btn web-amazon-link';
   amazon.href=amazonUrl(product);
   amazon.target='_blank';
-  amazon.rel='sponsored noopener noreferrer';
+  amazon.rel='sponsored nofollow noopener noreferrer';
   const amazonItemName=String(product.name||'THIS SCENT').trim();
   amazon.textContent='SHOP '+amazonItemName.toUpperCase()+' ON AMAZON';
   amazon.setAttribute('aria-label','Shop '+[product.brand,product.name].filter(Boolean).join(' ')+' on Amazon');
@@ -749,6 +791,36 @@ async function renderDetail(row,focusShop=''){
   summary.appendChild(diff);
 
   detail.appendChild(summary);
+
+  const wear=await fetchPublicWearDetails(row.comparison_id);
+  if(wear){
+    const opening=addisonWearCopy('opening',wear.opening_comparison,row);
+    const drydown=addisonWearCopy('drydown',wear.drydown_comparison,row);
+    const performance=addisonWearCopy('performance',wear.performance_comparison,row);
+    if(opening||drydown||performance){
+      const wearCard=document.createElement('div');
+      wearCard.className='web-detail-card web-wear-card';
+      wearCard.style.marginTop='16px';
+      wearCard.appendChild(textEl('div','web-compare-kicker','HOW IT WEARS'));
+      wearCard.appendChild(textEl('h3','','From first spray to dry-down'));
+      if(opening){
+        const p=document.createElement('p');
+        const b=document.createElement('strong'); b.textContent='Opening: ';
+        p.appendChild(b); p.appendChild(document.createTextNode(opening)); wearCard.appendChild(p);
+      }
+      if(drydown){
+        const p=document.createElement('p');
+        const b=document.createElement('strong'); b.textContent='Dry-down: ';
+        p.appendChild(b); p.appendChild(document.createTextNode(drydown)); wearCard.appendChild(p);
+      }
+      if(performance){
+        const p=document.createElement('p');
+        const b=document.createElement('strong'); b.textContent='Performance: ';
+        p.appendChild(b); p.appendChild(document.createTextNode(performance)); wearCard.appendChild(p);
+      }
+      detail.appendChild(wearCard);
+    }
+  }
 
   const [originalProfile,alternativeProfile]=await Promise.all([
     fetchProfile(original),fetchProfile(alternative)
@@ -983,7 +1055,7 @@ async function loadStyleMyScentDiscovery(){
         amazon.className='mini-btn';
         amazon.href='https://www.amazon.com/s?k='+encodeURIComponent(amazonQuery)+'&tag='+encodeURIComponent(SMS_AMAZON_TAG);
         amazon.target='_blank';
-        amazon.rel='sponsored noopener noreferrer';
+        amazon.rel='sponsored nofollow noopener noreferrer';
         amazon.textContent='SEARCH AMAZON';
         actions.appendChild(amazon);
 
