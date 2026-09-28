@@ -11,6 +11,7 @@
 const SMS_SUPABASE_URL='https://kdspdaffkbxxxgxlfnjo.supabase.co';
 const SMS_SUPABASE_KEY='sb_publishable_KCHzj9dxjrN_Jzzo0b1weQ_7LktkdMB';
 const SMS_AMAZON_TAG='stylemyscent-20';
+const MAX_DUPES_PER_DESIGNER=2;
 const SMS_CJ_URL=SMS_SUPABASE_URL+'/functions/v1/cj-deals';
 
 function safeHttpsUrl(value=''){
@@ -84,6 +85,36 @@ function homepageDesignerTier(row){
   if(alternativeDesigner && originalAlt) return 2;
   if(alternativeDesigner) return 1;
   return 0;
+}
+
+function designerBottleKey(row){
+  const originalDesigner=SMS_FAMILIAR_DESIGNER_BRANDS.has(normalized(row.original_brand));
+  const alternativeDesigner=SMS_FAMILIAR_DESIGNER_BRANDS.has(normalized(row.alternative_brand));
+  if(originalDesigner){
+    return ['designer',normalized(row.original_brand),normalized(row.original_name),normalized(row.original_concentration)].join('|');
+  }
+  if(alternativeDesigner){
+    return ['designer',normalized(row.alternative_brand),normalized(row.alternative_name),normalized(row.alternative_concentration)].join('|');
+  }
+  return ['original',normalized(row.original_brand),normalized(row.original_name),normalized(row.original_concentration)].join('|');
+}
+
+function limitTwoPerDesignerBottle(rows=[]){
+  const grouped=new Map();
+  for(const row of rows){
+    const key=designerBottleKey(row);
+    if(!grouped.has(key)) grouped.set(key,[]);
+    grouped.get(key).push(row);
+  }
+  const allowed=new Set();
+  for(const list of grouped.values()){
+    list.sort((a,b)=>
+      Number(b.estimated_similarity||0)-Number(a.estimated_similarity||0) ||
+      String(b.verified_at||'').localeCompare(String(a.verified_at||''))
+    );
+    list.slice(0,MAX_DUPES_PER_DESIGNER).forEach(row=>allowed.add(row.comparison_id));
+  }
+  return rows.filter(row=>allowed.has(row.comparison_id));
 }
 
 function rankHomepageComparisons(rows=[]){
@@ -169,9 +200,6 @@ function bottleSide(product,kicker,onShop){
 
 
 function comparisonCopyIsCustomerReady(row){
-  const badSimilarity=/(limited shared|independent comparison evidence|catalog currently|owner research|resolution file|database|machine|source-note|evidence links|research is still|not supplied|owner-approved resolution|supplied snapshot)/i;
-  const badDifference=/(owner research|resolution file|database|machine|source-note|evidence|not supplied|catalog currently)/i;
-  const badVerdict=/(OWNER[_ -]|owner-verified|human research|database|machine|resolution|corrected target|still filling|still gathering|not enough|unsure|research)/i;
   return Boolean(
     row &&
     row.compared_fragrance_id &&
@@ -183,56 +211,81 @@ function comparisonCopyIsCustomerReady(row){
       normalized(row.alternative_name)===normalized(row.original_name)
     ) &&
     String(row.similarities||'').trim() &&
-    String(row.differences||'').trim() &&
-    String(row.verdict||'').trim() &&
-    !/^(?:n\/?a|unknown|none|not supplied|no data)\.?$/i.test(String(row.similarities||'').trim()) &&
-    !/^(?:n\/?a|unknown|none|not supplied|no data)(?:\s*\([^)]*\))?\.?$/i.test(String(row.differences||'').trim()) &&
-    !/^(?:n\/?a|unknown|none|not supplied|no data)\.?$/i.test(String(row.verdict||'').trim()) &&
-    !badSimilarity.test(String(row.similarities||'')) &&
-    !badDifference.test(String(row.differences||'')) &&
-    !badVerdict.test(String(row.verdict||''))
+    String(row.differences||'').trim()
   );
 }
+
+function humanList(items=[]){
+  const clean=[...new Set((items||[]).map(x=>String(x||'').trim()).filter(Boolean))];
+  if(clean.length<=1) return clean[0]||'';
+  if(clean.length===2) return clean[0]+' and '+clean[1];
+  return clean.slice(0,-1).join(', ')+', and '+clean[clean.length-1];
+}
+
 function addisonComparisonCopy(kind,value,row={}){
-  let text=String(value||'').replace(/\s+/g,' ').trim();
-  if(!text) return '';
+  let copy=String(value||'').replace(/\s+/g,' ').trim();
+  const alt=String(row.alternative_name||'the alternative').trim();
+  const original=String(row.original_name||'the designer').trim();
+  const shared=Array.isArray(row.shared_notes)?row.shared_notes.filter(Boolean):[];
+  const similarity=Number(row.estimated_similarity);
+  const technical=/(owner[- ]?(approved|verified|research)|human research|workbook|csv|database|machine|evidence|source[- ]reported|source provides|catalog currently|still gathering|resolution file|supplied snapshot|pipeline|publication)/i;
 
   if(kind==='same'){
-    text=text
+    if(shared.length){
+      return `What makes this match work is the overlap in ${humanList(shared.slice(0,5))}. That shared structure keeps ${alt} close to ${original}'s signature instead of merely landing in the same fragrance family.`;
+    }
+    if(technical.test(copy)){
+      if(Number.isFinite(similarity)&&similarity>=90){
+        return `${alt} keeps the recognizable shape and mood of ${original} remarkably well. At about ${Math.round(similarity)}% similarity, this reads as a true alternative, not just a fragrance with a few notes in common.`;
+      }
+      return `${alt} stays in the same recognizable scent direction as ${original}, with enough structural overlap to feel familiar from the opening through the drydown.`;
+    }
+    copy=copy
       .replace(/^Both profiles share (.+?), keeping the overall scent direction closely related\.?$/i,
-        (_,notes)=>`I get the strongest overlap from ${notes} — that’s what keeps these two in the same scent neighborhood.`)
+        (_,notes)=>`The strongest connection is ${notes}. That is what makes ${alt} feel immediately familiar next to ${original}.`)
       .replace(/^Both profiles share (.+?)\.?$/i,
-        (_,notes)=>`The part that jumps out to me is ${notes}; that’s where these two feel most familiar.`);
+        (_,notes)=>`The strongest connection is ${notes}; that is where the resemblance comes through first.`);
+    return copy;
   }
 
   if(kind==='different'){
-    text=text
+    if(technical.test(copy)){
+      return `The difference is mostly in polish and texture. ${alt} keeps its own personality in the supporting notes and drydown, while ${original} holds onto the smoother designer finish.`;
+    }
+    copy=copy
       .replace(/^The Middle Eastern fragrance emphasizes (.+?), while the designer reference emphasizes (.+?)\.?$/i,
-        (_,alt,orig)=>`I’d expect the alternative to lean more into ${alt}, while the original pulls harder toward ${orig}.`)
+        (_,a,o)=>`The personality shifts in the supporting notes: ${alt} leans more into ${a}, while ${original} puts more emphasis on ${o}.`)
       .replace(/^The source fragrance emphasizes (.+?), while the designer reference emphasizes (.+?)\.?$/i,
-        (_,alt,orig)=>`I’d expect the alternative to lean more into ${alt}, while the original pulls harder toward ${orig}.`)
+        (_,a,o)=>`The personality shifts in the supporting notes: ${alt} leans more into ${a}, while ${original} puts more emphasis on ${o}.`)
       .replace(/^The alternative emphasizes (.+?), while the original emphasizes (.+?)\.?$/i,
-        (_,alt,orig)=>`I’d expect the alternative to lean more into ${alt}, while the original pulls harder toward ${orig}.`);
+        (_,a,o)=>`The personality shifts in the supporting notes: ${alt} leans more into ${a}, while ${original} puts more emphasis on ${o}.`);
+    return copy;
   }
 
   if(kind==='verdict'){
-    if(/^A strong alternative with a clearly related profile/i.test(text)){
-      return 'I’d put this in the strong-alternative lane: familiar enough to scratch the same itch, but different enough to keep its own personality.';
+    if(technical.test(copy) || !copy){
+      if(Number.isFinite(similarity)&&similarity>=90){
+        return `If you love ${original}, ${alt} is one I would confidently put in front of you. The signature stays very close, while the finish still gives you a reason to choose one bottle over the other.`;
+      }
+      return `If you love ${original}, ${alt} is a strong alternative to try side by side. The core scent idea stays familiar, while the drydown gives it its own character.`;
     }
-    if(/^A recognizable alternative that shares the same direction/i.test(text)){
-      return 'This is one I’d show you if you love the original but don’t need a one-for-one copy.';
+    if(/^A strong alternative with a clearly related profile/i.test(copy)){
+      return `If you like ${original}, I would put ${alt} in the strong-alternative lane: clearly familiar, but with enough personality to stand on its own.`;
     }
-    if(/^Extremely close on paper/i.test(text)){
-      return 'This is one of the closer matches I’d put in front of you — the differences are more about nuance and wear than a totally different scent.';
+    if(/^A recognizable alternative that shares the same direction/i.test(copy)){
+      return `This is one I would show you if you love ${original} but do not need a one-for-one copy.`;
     }
-    if(/^A very close alternative/i.test(text)){
-      return 'I’d call this a very close alternative: the overall vibe stays familiar, while the finish still has its own character.';
+    if(/^Extremely close on paper/i.test(copy)){
+      return `This is one of the closer matches I would put in front of you. The differences are more about nuance and wear than a different scent identity.`;
     }
+    if(/^A very close alternative/i.test(copy)){
+      return `I would call this a very close alternative: the overall signature stays familiar, while the finish keeps its own character.`;
+    }
+    return copy;
   }
 
-  return text;
+  return technical.test(copy)?'':copy;
 }
-
 
 async function noteReadyIds(rows=[],signal){
   const ids=[...new Set(rows.flatMap(row=>[row.fragrance_id,row.compared_fragrance_id]).filter(Boolean))];
@@ -392,17 +445,17 @@ async function fetchComparisons(query='',signal){
         bestByBottle.set(bottleKey,row);
       }
     }
-    return [...bestByBottle.values()].sort((a,b)=>Number(b.estimated_similarity)-Number(a.estimated_similarity));
+    return limitTwoPerDesignerBottle([...bestByBottle.values()].sort((a,b)=>Number(b.estimated_similarity)-Number(a.estimated_similarity)));
   }
 
   if(queryWords.length){
-    return [...searchReady].sort((a,b)=>
+    return limitTwoPerDesignerBottle([...searchReady].sort((a,b)=>
       Number(b.estimated_similarity||0)-Number(a.estimated_similarity||0) ||
       String(b.verified_at||'').localeCompare(String(a.verified_at||''))
-    );
+    ));
   }
 
-  return rankHomepageComparisons(websiteReady).slice(0,300);
+  return limitTwoPerDesignerBottle(rankHomepageComparisons(websiteReady)).slice(0,300);
 }
 
 const SMS_COMPACT_PROFILE_CACHE=new Map();
@@ -620,14 +673,14 @@ function renderCompareCard(row,openDetail){
   if(similarities){
     const p=document.createElement('p');
     p.className='web-compare-copy';
-    const b=document.createElement('strong'); b.textContent='What feels familiar: ';
+    const b=document.createElement('strong'); b.textContent='Why I paired them: ';
     p.appendChild(b); p.appendChild(document.createTextNode(similarities));
     card.appendChild(p);
   }
   if(differences){
     const p=document.createElement('p');
     p.className='web-compare-copy';
-    const b=document.createElement('strong'); b.textContent='Where they split: ';
+    const b=document.createElement('strong'); b.textContent='What changes on skin: ';
     p.appendChild(b); p.appendChild(document.createTextNode(differences));
     card.appendChild(p);
   }
@@ -678,21 +731,21 @@ async function renderDetail(row,focusShop=''){
 
   detail.appendChild(textEl('div','web-compare-kicker','DISCOVER YOUR NEXT SCENT'));
   detail.appendChild(textEl('h3','web-detail-title',[original.name,'↔',alternative.name].filter(Boolean).join(' ')));
-  detail.appendChild(textEl('p','web-detail-sub',(Number.isFinite(similarity)?'≈ '+Math.round(similarity)+'% similar. ':'')+'See what feels familiar, where the scents split, and shop either side.'));
+  detail.appendChild(textEl('p','web-detail-sub',(Number.isFinite(similarity)?'≈ '+Math.round(similarity)+'% similar. ':'')+'Here is why I paired them, what changes on skin, and how I would choose between the two.'));
 
   const summary=document.createElement('div');
   summary.className='web-detail-grid';
 
   const same=document.createElement('div');
   same.className='web-detail-card';
-  same.appendChild(textEl('h3','','What feels the same'));
-  same.appendChild(textEl('p','',addisonComparisonCopy('same',row.similarities,row)||'These two land in a similar scent neighborhood, which is why I paired them.'));
+  same.appendChild(textEl('h3','','Why I paired them'));
+  same.appendChild(textEl('p','',addisonComparisonCopy('same',row.similarities,row)||'I paired these because the scent signature stays recognizably close, not because of a loose note overlap.'));
   summary.appendChild(same);
 
   const diff=document.createElement('div');
   diff.className='web-detail-card';
-  diff.appendChild(textEl('h3','','Where they split'));
-  diff.appendChild(textEl('p','',addisonComparisonCopy('different',row.differences,row)||'They still keep their own personality once you get into the details and drydown.'));
+  diff.appendChild(textEl('h3','',"What changes on skin"));
+  diff.appendChild(textEl('p','',addisonComparisonCopy('different',row.differences,row)||'The biggest differences show up in the supporting notes, texture, and drydown. That is where each bottle keeps its own personality.'));
   summary.appendChild(diff);
 
   detail.appendChild(summary);
@@ -713,7 +766,7 @@ async function renderDetail(row,focusShop=''){
   addison.style.marginTop='16px';
   addison.appendChild(textEl('div','web-compare-kicker','ADDISON SAYS'));
   addison.appendChild(textEl('h3','','The quick take'));
-  addison.appendChild(textEl('p','',addisonComparisonCopy('verdict',row.verdict,row)||'I’d use the similarity as your shortcut, then pick the bottle whose details sound most like you.'));
+  addison.appendChild(textEl('p','',addisonComparisonCopy('verdict',row.verdict,row)||'Use the similarity as your shortcut, then let the note profile and drydown tell you which one fits your style.'));
   detail.appendChild(addison);
 
   const shops=document.createElement('div');
