@@ -177,6 +177,8 @@ async function renderDesignerDupeSection(product,comparisons){
   }
 
   host.hidden=false;
+  const mainShop=el('shop-wrap');
+  if(mainShop) mainShop.hidden=true;
   host.replaceChildren();
 
   const kicker=document.createElement('div');
@@ -314,7 +316,11 @@ async function renderDesignerDupeSection(product,comparisons){
       bottleImg.classList.add('bottle-shop');
       bottleImg.tabIndex=0;
       bottleImg.title='Shop '+name;
-      const jump=()=>el('shop-wrap')?.scrollIntoView({behavior:'smooth',block:'center'});
+      const jump=()=>{
+        const dupeHost=el('dupe-wrap');
+        const target=(dupeHost && !dupeHost.hidden)?dupeHost:el('shop-wrap');
+        target?.scrollIntoView({behavior:'smooth',block:'center'});
+      };
       bottleImg.addEventListener('click',jump);
       bottleImg.addEventListener('keydown',event=>{
         if(event.key==='Enter'||event.key===' '){event.preventDefault();jump();}
