@@ -318,7 +318,7 @@ function addisonWearCopy(kind,value,row={}){
   }
   if(kind==='drydown'){
     return t
-      .replace(/^Both drydowns meet around (.+?)\.?$/i,(_,notes)=>`They settle into the same ${notes} direction, which keeps the finish familiar on skin.`)
+      .replace(/^Both drydowns meet around (.+?)\.?$/i,(_,notes)=>`They settle into the same ${notes} direction, which keeps the finish familiar as the fragrance settles.`)
       .replace(/^The drydowns separate more clearly than the opening, with different base-note emphasis\.?$/i,`This is where they part ways most: ${alt} shifts into a different base-note balance while ${original} keeps the original designer finish.`);
   }
   if(kind==='performance'){
@@ -722,7 +722,7 @@ function renderCompareCard(row,openDetail){
   if(differences){
     const p=document.createElement('p');
     p.className='web-compare-copy';
-    const b=document.createElement('strong'); b.textContent='What changes on skin: ';
+    const b=document.createElement('strong'); b.textContent='Where they differ: ';
     p.appendChild(b); p.appendChild(document.createTextNode(differences));
     card.appendChild(p);
   }
@@ -773,7 +773,7 @@ async function renderDetail(row,focusShop=''){
 
   detail.appendChild(textEl('div','web-compare-kicker','DISCOVER YOUR NEXT SCENT'));
   detail.appendChild(textEl('h3','web-detail-title',[original.name,'↔',alternative.name].filter(Boolean).join(' ')));
-  detail.appendChild(textEl('p','web-detail-sub',(Number.isFinite(similarity)?'≈ '+Math.round(similarity)+'% similar. ':'')+'Here is why I paired them, what changes on skin, and how I would choose between the two.'));
+  detail.appendChild(textEl('p','web-detail-sub',(Number.isFinite(similarity)?'≈ '+Math.round(similarity)+'% similar. ':'')+'Here is why I paired them, where they differ, and how the opening and dry-down develop.'));
 
   const summary=document.createElement('div');
   summary.className='web-detail-grid';
@@ -786,8 +786,8 @@ async function renderDetail(row,focusShop=''){
 
   const diff=document.createElement('div');
   diff.className='web-detail-card';
-  diff.appendChild(textEl('h3','',"What changes on skin"));
-  diff.appendChild(textEl('p','',addisonComparisonCopy('different',row.differences,row)||'The biggest differences show up in the supporting notes, texture, and drydown. That is where each bottle keeps its own personality.'));
+  diff.appendChild(textEl('h3','',"Where they differ"));
+  diff.appendChild(textEl('p','',addisonComparisonCopy('different',row.differences,row)||'The biggest differences usually show up in the supporting notes, texture, and dry-down. That is where each bottle keeps its own personality.'));
   summary.appendChild(diff);
 
   detail.appendChild(summary);
@@ -801,8 +801,8 @@ async function renderDetail(row,focusShop=''){
       const wearCard=document.createElement('div');
       wearCard.className='web-detail-card web-wear-card';
       wearCard.style.marginTop='16px';
-      wearCard.appendChild(textEl('div','web-compare-kicker','HOW IT WEARS'));
-      wearCard.appendChild(textEl('h3','','From first spray to dry-down'));
+      wearCard.appendChild(textEl('div','web-compare-kicker','HOW THE SCENTS DEVELOP'));
+      wearCard.appendChild(textEl('h3','','From opening to dry-down'));
       if(opening){
         const p=document.createElement('p');
         const b=document.createElement('strong'); b.textContent='Opening: ';
@@ -818,6 +818,7 @@ async function renderDetail(row,focusShop=''){
         const b=document.createElement('strong'); b.textContent='Performance: ';
         p.appendChild(b); p.appendChild(document.createTextNode(performance)); wearCard.appendChild(p);
       }
+      wearCard.appendChild(textEl('p','web-wear-note','Dry-down is the direction I expect from the fragrance as it settles; exact wear can shift with skin chemistry, climate and application.'));
       detail.appendChild(wearCard);
     }
   }
