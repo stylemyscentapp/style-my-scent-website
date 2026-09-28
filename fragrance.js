@@ -201,7 +201,7 @@ function stylistWearCopy(kind,value,alternative,designer){
   }
   if(kind==='drydown'){
     t=t
-      .replace(/^Both drydowns meet around (.+?)\.?$/i,(_,notes)=>`They settle into the same ${notes} direction, which keeps the finish familiar on skin.`)
+      .replace(/^Both drydowns meet around (.+?)\.?$/i,(_,notes)=>`They settle into the same ${notes} direction, which keeps the finish familiar as the fragrance settles.`)
       .replace(/^The drydowns separate more clearly than the opening, with different base-note emphasis\.?$/i,`This is where they part ways most: ${alt} shifts into a different base-note balance while ${orig} keeps the original designer finish.`);
   }
   if(kind==='performance'){
@@ -400,7 +400,7 @@ async function renderDesignerDupeSection(product,comparisons){
         const wearBox=document.createElement('div');
         wearBox.className='designer-dupe-wear';
         const wearLabel=document.createElement('b');
-        wearLabel.textContent='HOW IT WEARS';
+        wearLabel.textContent='HOW THE SCENTS DEVELOP';
         wearBox.appendChild(wearLabel);
         if(opening){
           const p=document.createElement('p');
@@ -417,6 +417,10 @@ async function renderDesignerDupeSection(product,comparisons){
           p.innerHTML='<strong>Performance:</strong> '+esc(performance);
           wearBox.appendChild(p);
         }
+        const note=document.createElement('p');
+        note.className='designer-dupe-wear-note';
+        note.textContent='Dry-down is a scent-direction guide; skin chemistry, climate and application can shift the exact wear.';
+        wearBox.appendChild(note);
         card.appendChild(wearBox);
       }
     }
@@ -469,7 +473,7 @@ async function renderDesignerDupeSection(product,comparisons){
     el('fragrance-subtitle').textContent=[p.brand,p.concentration,year].filter(Boolean).join(' · ');
     el('meta-description').content=('Love '+name+'? See Addison’s two strongest alternatives, why they work, how the dry-down changes, and current shopping options.').slice(0,160);
     addMeta('#og-title','content',name+' Dupes & Alternatives | Style My Scent');
-    addMeta('#og-description','content',('See Addison’s closest alternatives to '+name+', what changes on skin, and current shopping options.').slice(0,180));
+    addMeta('#og-description','content',('See Addison’s closest alternatives to '+name+', where they differ, how the dry-down develops, and current shopping options.').slice(0,180));
     addMeta('#og-url','content',canonical);
     setCanonical(canonical);
 
