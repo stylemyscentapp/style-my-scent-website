@@ -248,6 +248,7 @@ async function renderDesignerDupeSection(product,comparisons){
   });
 
   host.appendChild(grid);
+  host.dataset.shownDupeIds=picks.map(x=>x.other.id).filter(Boolean).join(',');
 }
 
 (async()=>{
@@ -347,19 +348,34 @@ async function renderDesignerDupeSection(product,comparisons){
       await renderDesignerDupeSection(p,comps);
 
       const wrap=el('similar-wrap');
-      if(comps.length){
+      const shownDupeIds=new Set(String(el('dupe-wrap')?.dataset.shownDupeIds||'').split(',').filter(Boolean));
+      const moreSeen=new Set();
+      const moreReady=[];
+      for(const c of comps){
+        const sim=Number(c.estimated_similarity);
+        if(!Number.isFinite(sim)||sim<70) continue;
+        const other=comparisonOtherSide(c,id);
+        if(!other?.id || shownDupeIds.has(other.id)) continue;
+        const nameKey=normalized(other.brand)+'|'+normalized(other.name);
+        if(moreSeen.has(nameKey)) continue;
+        const copy=String(c.similarities||c.verdict||'').trim();
+        if(/limited shared-note detail|catalog currently|independent comparison evidence/i.test(copy)) continue;
+        moreSeen.add(nameKey);
+        moreReady.push({c,other,sim});
+        if(moreReady.length>=3) break;
+      }
+      if(moreReady.length){
+        wrap.hidden=false;
         wrap.innerHTML='<div class="eyebrow">MORE SIMILAR SCENTS</div>'+
-          comps.slice(0,4).map(c=>{
-            const other=comparisonOtherSide(c,id);
-            if(!other)return '';
-            return '<div class="compare"><h3>'+esc([other.brand,other.name].filter(Boolean).join(' '))+'</h3>'+
-              '<div class="muted">'+
-              (Number.isFinite(Number(c.estimated_similarity))?'≈ '+Math.round(Number(c.estimated_similarity))+'% similarity · ':'')+
-              esc(c.similarities||c.verdict||'Related scent direction in the Style My Scent comparison catalog.')+
-              '</div></div>';
-          }).join('');
+          moreReady.map(({c,other,sim})=>
+            '<div class="compare"><h3>'+esc([other.brand,other.name].filter(Boolean).join(' '))+'</h3>'+
+            '<div class="muted">≈ '+Math.round(sim)+'% similarity · '+
+            esc(c.similarities||c.verdict||'Related scent direction in the Style My Scent comparison catalog.')+
+            '</div></div>'
+          ).join('');
       }else{
-        wrap.innerHTML='<div class="eyebrow">MORE SIMILAR SCENTS</div><p class="muted">No public comparison is attached to this fragrance yet.</p>';
+        wrap.hidden=true;
+        wrap.replaceChildren();
       }
     }catch{
       const host=el('dupe-wrap');if(host)host.hidden=true;
