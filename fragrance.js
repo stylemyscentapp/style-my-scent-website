@@ -9,13 +9,7 @@ const el=(id)=>document.getElementById(id);
 const clean=(v)=>Array.isArray(v)?v.filter(Boolean):[];
 const text=(v)=>String(v??'');
 
-const DESIGNER_BRANDS=new Set([
-  'azzaro','burberry','bvlgari','calvin klein','carolina herrera','chanel','chloe','coach',
-  'dior','dolce gabbana','dolce and gabbana','giorgio armani','givenchy','gucci','hermes',
-  'hugo boss','issey miyake','jean paul gaultier','jimmy choo','lancome','marc jacobs',
-  'mugler','paco rabanne','prada','rabanne','ralph lauren','tom ford','valentino',
-  'versace','viktor rolf','viktor and rolf','yves saint laurent','ysl'
-]);
+const DESIGNER_BRANDS=new Set(['ariana grande','azzaro','burberry','bvlgari','calvin klein','carolina herrera','chanel','chloe','coach','davidoff','dior','dolce & gabbana','dunhill','elie saab','escada','giorgio armani','givenchy','gucci','guess','hermes','hugo boss','issey miyake','jean paul gaultier','jimmy choo','juicy couture','lacoste','marc jacobs','michael kors','montblanc','moschino','mugler','narciso rodriguez','prada','rabanne','ralph lauren','tiffany & co.','tom ford','valentino','versace','viktor & rolf','yves saint laurent']);
 
 function normalized(value=''){
   return String(value||'').toLowerCase().normalize('NFKD')
@@ -152,7 +146,7 @@ async function renderDesignerDupeSection(product,comparisons){
     const other=comparisonOtherSide(c,product.id);
     if(!other?.id || seen.has(other.id))continue;
     const sim=Number(c.estimated_similarity);
-    if(!Number.isFinite(sim)||sim<60)continue;
+    if(!Number.isFinite(sim)||sim<70)continue;
     if(normalized(other.brand)===normalized(product.brand))continue;
 
     const rel=normalized(c.relationship);
@@ -339,7 +333,7 @@ async function renderDesignerDupeSection(product,comparisons){
       select:'comparison_id,fragrance_id,compared_fragrance_id,relationship,estimated_similarity,alternative_brand,alternative_name,original_brand,original_name,similarities,differences,verdict,owner_verified',
       or:'(fragrance_id.eq.'+id+',compared_fragrance_id.eq.'+id+')',
       order:'estimated_similarity.desc',
-      limit:'12'
+      limit:'30'
     });
 
     try{
