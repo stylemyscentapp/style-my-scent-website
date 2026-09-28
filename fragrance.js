@@ -50,31 +50,57 @@ async function fetchProduct(productId){
   const rows=await api('/rest/v1/fragrances?'+q.toString());
   return rows[0]||null;
 }
-async function fetchAffiliateOffers(product){
+async function fetchAffiliateSnapshot(product){
   const q=[product.brand,product.canonical_name,product.concentration||product.product_type]
     .filter(Boolean).join(' ').trim();
-  if(!q)return [];
+  if(!q)return {deals:[],checkedAt:null,maxPriceAgeMinutes:10};
   try{
     const r=await fetch(SMS_CJ_URL+'?q='+encodeURIComponent(q)+'&channel=website',{
       headers:{apikey:SMS_KEY,Accept:'application/json'}
     });
-    if(!r.ok)return [];
+    if(!r.ok)return {deals:[],checkedAt:null,maxPriceAgeMinutes:10};
     const data=await r.json();
     const nameTokens=normalized(product.canonical_name).split(' ').filter(x=>x.length>2);
     const brandTokens=normalized(product.brand).split(' ').filter(x=>x.length>2);
-    return (data.deals||[]).filter(deal=>{
+    const deals=(data.deals||[]).filter(deal=>{
       const hay=normalized((deal.title||'')+' '+(deal.description||''));
       return nameTokens.every(t=>hay.includes(t)) &&
         brandTokens.every(t=>hay.includes(t)) &&
+        deal.saleVariant==='Retail bottle' &&
         safeHttps(deal.affiliateUrl);
     }).sort((a,b)=>Number(a.price||0)-Number(b.price||0));
-  }catch{return []}
+    return {deals,checkedAt:data.checkedAt||null,maxPriceAgeMinutes:Number(data.maxPriceAgeMinutes||10)};
+  }catch{
+    return {deals:[],checkedAt:null,maxPriceAgeMinutes:10};
+  }
 }
-function amazonUrl(product){
-  const q=[product.brand,product.canonical_name,product.concentration||product.product_type].filter(Boolean).join(' ');
+async function fetchAffiliateOffers(product){
+  return (await fetchAffiliateSnapshot(product)).deals;
+}
+function amazonUrl(product,sizeLabel=''){
+  const q=[product.brand,product.canonical_name,product.concentration||product.product_type,sizeLabel]
+    .filter(Boolean).join(' ');
   return 'https://www.amazon.com/s?k='+encodeURIComponent(q)+'&tag='+encodeURIComponent(SMS_AMAZON_TAG);
 }
-async function renderShopLinks(product,host,maxRetailers=2){
+function bestCommonSizeBucket(designerDeals,dupeDealSets){
+  const designerBuckets=new Set(designerDeals.map(x=>Number(x.sizeBucket)).filter(Number.isFinite));
+  const support=new Map();
+  for(const deals of dupeDealSets){
+    const seen=new Set();
+    for(const d of deals){
+      const bucket=Number(d.sizeBucket);
+      if(!Number.isFinite(bucket)||!designerBuckets.has(bucket)||seen.has(bucket))continue;
+      seen.add(bucket);
+      support.set(bucket,(support.get(bucket)||0)+1);
+    }
+  }
+  return [...support.entries()].sort((a,b)=>b[1]-a[1]||b[0]-a[0])[0]?.[0]||null;
+}
+function sizeLabelForBucket(offers,bucket){
+  const row=offers.find(x=>Number(x.sizeBucket)===Number(bucket));
+  return row?.sizeLabel||'';
+}
+async function renderShopLinks(product,host,maxRetailers=2,options={}){
   if(!host)return;
   host.replaceChildren();
 
@@ -83,16 +109,34 @@ async function renderShopLinks(product,host,maxRetailers=2){
   status.textContent='Checking current partner prices…';
   host.appendChild(status);
 
-  const offers=await fetchAffiliateOffers(product);
+  const snapshot=options.snapshot||await fetchAffiliateSnapshot(product);
+  const rawBucket=options.targetSizeBucket;
+  const targetSizeBucket=(rawBucket===null||rawBucket===undefined)?null:Number(rawBucket);
+  const matched=targetSizeBucket!==null&&Number.isFinite(targetSizeBucket);
+  let offers=snapshot.deals||[];
+
+  if(matched){
+    offers=offers.filter(offer=>Number(offer.sizeBucket)===targetSizeBucket);
+  }else if(options.requireMatchedSize){
+    offers=[];
+  }
+
   const byRetailer=new Map();
   for(const offer of offers){
     const key=normalized(offer.retailer||offer.advertiserId||'partner');
-    if(!byRetailer.has(key))byRetailer.set(key,offer);
+    const existing=byRetailer.get(key);
+    if(!existing||Number(offer.price)<Number(existing.price))byRetailer.set(key,offer);
   }
   const rows=[...byRetailer.values()].slice(0,maxRetailers);
+  const sizeLabel=matched
+    ? (options.sizeLabel||sizeLabelForBucket(offers,targetSizeBucket))
+    : (rows[0]?.sizeLabel||'');
+
   status.textContent=rows.length
-    ? 'Current partner offers'
-    : 'No exact partner price right now — Amazon search is available.';
+    ? ((sizeLabel?'MATCHED SIZE · '+sizeLabel+' · ':'')+'price checked within 10 min')
+    : (options.requireMatchedSize
+        ? 'No same-size live partner price right now — no mismatched price shown.'
+        : 'No exact retail-bottle partner price right now — Amazon search is available.');
 
   for(const offer of rows){
     const a=document.createElement('a');
@@ -102,16 +146,17 @@ async function renderShopLinks(product,host,maxRetailers=2){
     a.rel='sponsored noopener noreferrer';
     const n=Number(offer.price);
     a.textContent='SHOP '+String(offer.retailer||'PARTNER').toUpperCase()+
+      (offer.sizeLabel?' · '+offer.sizeLabel:'')+
       (Number.isFinite(n)&&n>0?' · $'+n.toFixed(2):'');
     host.appendChild(a);
   }
 
   const amazon=document.createElement('a');
   amazon.className='compare-shop-link secondary';
-  amazon.href=amazonUrl(product);
+  amazon.href=amazonUrl(product,sizeLabel);
   amazon.target='_blank';
   amazon.rel='sponsored noopener noreferrer';
-  amazon.textContent='SHOP ON AMAZON';
+  amazon.textContent=options.requireMatchedSize?'CHECK SAME SIZE ON AMAZON':'SHOP ON AMAZON';
   host.appendChild(amazon);
 }
 
@@ -164,17 +209,41 @@ async function renderDesignerDupeSection(product,comparisons){
     b.sim-a.sim
   );
 
-  const picks=candidates.slice(0,2);
-  if(!picks.length){
+  const candidatePicks=candidates.slice(0,6);
+  if(!candidatePicks.length){
     host.hidden=true;
     return;
   }
 
-  const dupeProducts=(await Promise.all(picks.map(x=>fetchProduct(x.other.id)))).filter(Boolean);
-  if(!dupeProducts.length){
+  const candidateProducts=await Promise.all(candidatePicks.map(x=>fetchProduct(x.other.id)));
+  const paired=candidatePicks.map((pick,index)=>({pick,product:candidateProducts[index]})).filter(x=>x.product);
+  if(!paired.length){
     host.hidden=true;
     return;
   }
+
+  const designerSnapshot=await fetchAffiliateSnapshot(product);
+  const dupeSnapshots=await Promise.all(paired.map(x=>fetchAffiliateSnapshot(x.product)));
+  const targetSizeBucket=bestCommonSizeBucket(designerSnapshot.deals,dupeSnapshots.map(x=>x.deals));
+
+  let selected=paired.map((x,index)=>({...x,snapshot:dupeSnapshots[index]}));
+  if(targetSizeBucket!==null){
+    selected=selected.filter(x=>x.snapshot.deals.some(d=>Number(d.sizeBucket)===Number(targetSizeBucket)));
+  }
+  selected=selected.slice(0,2);
+
+  if(!selected.length){
+    selected=paired.slice(0,1).map((x,index)=>({...x,snapshot:dupeSnapshots[index]}));
+  }
+
+  const picks=selected.map(x=>x.pick);
+  const dupeProducts=selected.map(x=>x.product);
+  const selectedDupeSnapshots=selected.map(x=>x.snapshot);
+  const matchedSizeLabel=targetSizeBucket!==null
+    ? (sizeLabelForBucket(designerSnapshot.deals,targetSizeBucket) ||
+       selectedDupeSnapshots.map(s=>sizeLabelForBucket(s.deals,targetSizeBucket)).find(Boolean) ||
+       '')
+    : '';
 
   host.hidden=false;
   const mainShop=el('shop-wrap');
@@ -193,13 +262,13 @@ async function renderDesignerDupeSection(product,comparisons){
 
   const intro=document.createElement('p');
   intro.className='muted';
-  intro.textContent='Compare the original with up to two verified alternatives, then shop whichever bottle you want.';
+  intro.textContent=targetSizeBucket!==null ? 'Prices are matched to the same bottle-size tier and refreshed at least every 10 minutes. Testers are excluded.' : 'We only show retail-bottle pricing. If the designer and dupe do not have the same live size, we do not show mismatched prices.';
   host.appendChild(intro);
 
   const grid=document.createElement('div');
   grid.className='designer-dupe-grid';
 
-  const makeCard=(prod,label,similarity,comparison=null)=>{
+  const makeCard=(prod,label,similarity,comparison=null,snapshot=null)=>{
     const card=document.createElement('article');
     card.className='designer-dupe-card';
 
@@ -252,14 +321,20 @@ async function renderDesignerDupeSection(product,comparisons){
     const shop=document.createElement('div');
     shop.className='designer-dupe-shop';
     card.appendChild(shop);
-    renderShopLinks(prod,shop,2);
+    renderShopLinks(prod,shop,2,{snapshot,targetSizeBucket,sizeLabel:matchedSizeLabel,requireMatchedSize:true});
 
     return card;
   };
 
-  grid.appendChild(makeCard(product,'DESIGNER',null,null));
+  grid.appendChild(makeCard(product,'DESIGNER',null,null,designerSnapshot));
   dupeProducts.forEach((prod,index)=>{
-    grid.appendChild(makeCard(prod,index===0?'DUPE':'DUPE OPTION 2',picks[index]?.sim,picks[index]));
+    grid.appendChild(makeCard(
+      prod,
+      index===0?'DUPE':'DUPE OPTION 2',
+      picks[index]?.sim,
+      picks[index],
+      selectedDupeSnapshots[index]
+    ));
   });
 
   host.appendChild(grid);
