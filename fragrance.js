@@ -2,6 +2,7 @@ const SMS_URL='https://kdspdaffkbxxxgxlfnjo.supabase.co';
 const SMS_KEY='sb_publishable_KCHzj9dxjrN_Jzzo0b1weQ_7LktkdMB';
 const SMS_CJ_URL=SMS_URL+'/functions/v1/cj-deals';
 const SMS_AMAZON_TAG='stylemyscent-20';
+const MAX_DUPES_PER_DESIGNER=2;
 
 const params=new URLSearchParams(location.search);
 const id=params.get('id');
@@ -177,6 +178,42 @@ function comparisonOtherSide(c,currentId){
   return null;
 }
 
+function stylistDupeReason(comparison,alternative,designer){
+  const sim=Number(comparison?.estimated_similarity);
+  const clean=(value='')=>String(value||'').replace(/\s+/g,' ').trim();
+  const forbidden=/(owner[- ]?(approved|verified|research)|human research|workbook|csv|database|machine|evidence|source[- ]reported|source provides|catalog currently|still gathering|resolution file)/i;
+  const same=clean(comparison?.similarities);
+  const diff=clean(comparison?.differences);
+  const shared=Array.isArray(comparison?.shared_notes)?comparison.shared_notes.filter(Boolean):[];
+
+  if(same && !forbidden.test(same)){
+    let line=same
+      .replace(/^Both profiles share (.+?), keeping the overall scent direction closely related\.?$/i,
+        (_,notes)=>`The strongest overlap is ${notes}, which keeps the scent signature immediately familiar.`)
+      .replace(/^Both profiles share (.+?)\.?$/i,
+        (_,notes)=>`The strongest overlap is ${notes}, and that is where the resemblance comes through first.`);
+    if(diff && !forbidden.test(diff)){
+      line+=' '+diff
+        .replace(/^The Middle Eastern fragrance emphasizes (.+?), while the designer reference emphasizes (.+?)\.?$/i,
+          (_,a,o)=>`The alternative leans more into ${a}, while the designer keeps more of ${o}.`)
+        .replace(/^The source fragrance emphasizes (.+?), while the designer reference emphasizes (.+?)\.?$/i,
+          (_,a,o)=>`The alternative leans more into ${a}, while the designer keeps more of ${o}.`);
+    }
+    return line;
+  }
+
+  if(shared.length){
+    const notes=shared.slice(0,5).join(', ');
+    return `The match is anchored by ${notes}. That shared structure keeps ${alternative?.canonical_name||'the alternative'} close to ${designer?.canonical_name||'the designer'} while still leaving room for its own finish.`;
+  }
+
+  if(Number.isFinite(sim)){
+    if(sim>=90) return `At about ${Math.round(sim)}% similarity, this is one of the closest alternatives I would put beside ${designer?.canonical_name||'the designer'}. The overall scent identity stays very familiar, with the differences showing up mostly in texture and drydown.`;
+    if(sim>=80) return `At about ${Math.round(sim)}% similarity, this is a strong alternative: the signature stays recognizable, while the supporting notes give it a little more personality of its own.`;
+  }
+  return `This keeps the same recognizable scent direction as ${designer?.canonical_name||'the designer'}, with enough overlap to feel familiar and enough difference to keep its own character.`;
+}
+
 async function renderDesignerDupeSection(product,comparisons){
   const host=el('dupe-wrap');
   if(!host)return;
@@ -204,12 +241,13 @@ async function renderDesignerDupeSection(product,comparisons){
   }
 
   candidates.sort((a,b)=>
-    Number(Boolean(b.direct))-Number(Boolean(a.direct)) ||
+    b.sim-a.sim ||
     Number(Boolean(b.owner_verified))-Number(Boolean(a.owner_verified)) ||
-    b.sim-a.sim
+    Number(Boolean(b.direct))-Number(Boolean(a.direct))
   );
 
-  const candidatePicks=candidates.slice(0,6);
+  // Customer rule: show no more than two dupes, always the highest verified scores.
+  const candidatePicks=candidates.slice(0,MAX_DUPES_PER_DESIGNER);
   if(!candidatePicks.length){
     host.hidden=true;
     return;
@@ -226,15 +264,11 @@ async function renderDesignerDupeSection(product,comparisons){
   const dupeSnapshots=await Promise.all(paired.map(x=>fetchAffiliateSnapshot(x.product)));
   const targetSizeBucket=bestCommonSizeBucket(designerSnapshot.deals,dupeSnapshots.map(x=>x.deals));
 
-  let selected=paired.map((x,index)=>({...x,snapshot:dupeSnapshots[index]}));
-  if(targetSizeBucket!==null){
-    selected=selected.filter(x=>x.snapshot.deals.some(d=>Number(d.sizeBucket)===Number(targetSizeBucket)));
-  }
-  selected=selected.slice(0,2);
-
-  if(!selected.length){
-    selected=paired.slice(0,1).map((x,index)=>({...x,snapshot:dupeSnapshots[index]}));
-  }
+  // Keep the two strongest scent matches even when a same-size price is unavailable.
+  // Price matching is handled separately so shopping data can never demote a better dupe.
+  const selected=paired
+    .map((x,index)=>({...x,snapshot:dupeSnapshots[index]}))
+    .slice(0,MAX_DUPES_PER_DESIGNER);
 
   const picks=selected.map(x=>x.pick);
   const dupeProducts=selected.map(x=>x.product);
@@ -252,17 +286,17 @@ async function renderDesignerDupeSection(product,comparisons){
 
   const kicker=document.createElement('div');
   kicker.className='eyebrow';
-  kicker.textContent='DESIGNER VS DUPES';
+  kicker.textContent='ADDISON’S BEST MATCHES';
   host.appendChild(kicker);
 
   const title=document.createElement('h3');
   title.className='compare-section-title';
-  title.textContent='Shop the designer or save with a similar scent.';
+  title.textContent='Keep the designer, or get the same mood for less.';
   host.appendChild(title);
 
   const intro=document.createElement('p');
   intro.className='muted';
-  intro.textContent=targetSizeBucket!==null ? 'Prices are matched to the same bottle-size tier and refreshed at least every 10 minutes. Testers are excluded.' : 'We only show retail-bottle pricing. If the designer and dupe do not have the same live size, we do not show mismatched prices.';
+  intro.textContent=targetSizeBucket!==null ? 'I matched the bottle sizes so you can compare the prices fairly. These prices are refreshed at least every 10 minutes, and I leave testers out.' : 'I only show retail bottles here. If I cannot match the designer and dupe to the same live size, I would rather hold the price than give you a misleading comparison.';
   host.appendChild(intro);
 
   const grid=document.createElement('div');
@@ -304,16 +338,12 @@ async function renderDesignerDupeSection(product,comparisons){
     }
 
     if(comparison){
-      let why=String(comparison.similarities||comparison.verdict||'').replace(/\s+/g,' ').trim();
-      if(!why || /limited shared-note detail|catalog currently|independent comparison evidence|owner research|database|machine/i.test(why)){
-        why='It follows the same overall scent direction and key accord family, making it a strong alternative to the designer.';
-      }
       const whyBox=document.createElement('div');
       whyBox.className='designer-dupe-why';
       const whyLabel=document.createElement('b');
-      whyLabel.textContent="WHY IT'S A GOOD DUPE";
+      whyLabel.textContent="WHY ADDISON LIKES THIS MATCH";
       const whyText=document.createElement('p');
-      whyText.textContent=why;
+      whyText.textContent=stylistDupeReason(comparison,prod,product);
       whyBox.append(whyLabel,whyText);
       card.appendChild(whyBox);
     }
@@ -427,7 +457,7 @@ async function renderDesignerDupeSection(product,comparisons){
     document.head.appendChild(s);
 
     const cp=new URLSearchParams({
-      select:'comparison_id,fragrance_id,compared_fragrance_id,relationship,estimated_similarity,alternative_brand,alternative_name,original_brand,original_name,similarities,differences,verdict,owner_verified',
+      select:'comparison_id,fragrance_id,compared_fragrance_id,relationship,estimated_similarity,shared_notes,alternative_brand,alternative_name,original_brand,original_name,similarities,differences,verdict,owner_verified',
       or:'(fragrance_id.eq.'+id+',compared_fragrance_id.eq.'+id+')',
       order:'estimated_similarity.desc',
       limit:'30'
@@ -438,34 +468,39 @@ async function renderDesignerDupeSection(product,comparisons){
       await renderDesignerDupeSection(p,comps);
 
       const wrap=el('similar-wrap');
-      const shownDupeIds=new Set(String(el('dupe-wrap')?.dataset.shownDupeIds||'').split(',').filter(Boolean));
-      const moreSeen=new Set();
-      const moreReady=[];
-      for(const c of comps){
-        const sim=Number(c.estimated_similarity);
-        if(!Number.isFinite(sim)||sim<70) continue;
-        const other=comparisonOtherSide(c,id);
-        if(!other?.id || shownDupeIds.has(other.id)) continue;
-        const nameKey=normalized(other.brand)+'|'+normalized(other.name);
-        if(moreSeen.has(nameKey)) continue;
-        const copy=String(c.similarities||c.verdict||'').trim();
-        if(/limited shared-note detail|catalog currently|independent comparison evidence/i.test(copy)) continue;
-        moreSeen.add(nameKey);
-        moreReady.push({c,other,sim});
-        if(moreReady.length>=3) break;
-      }
-      if(moreReady.length){
-        wrap.hidden=false;
-        wrap.innerHTML='<div class="eyebrow">MORE SIMILAR SCENTS</div>'+
-          moreReady.map(({c,other,sim})=>
-            '<div class="compare"><h3>'+esc([other.brand,other.name].filter(Boolean).join(' '))+'</h3>'+
-            '<div class="muted">≈ '+Math.round(sim)+'% similarity · '+
-            esc(c.similarities||c.verdict||'Related scent direction in the Style My Scent comparison catalog.')+
-            '</div></div>'
-          ).join('');
-      }else{
+      const isDesigner=DESIGNER_BRANDS.has(normalized(p.brand));
+      if(isDesigner){
+        // The two strongest dupe cards above are the complete customer choice.
         wrap.hidden=true;
         wrap.replaceChildren();
+      }else{
+        const shownDupeIds=new Set(String(el('dupe-wrap')?.dataset.shownDupeIds||'').split(',').filter(Boolean));
+        const moreSeen=new Set();
+        const moreReady=[];
+        for(const c of comps){
+          const sim=Number(c.estimated_similarity);
+          if(!Number.isFinite(sim)||sim<70) continue;
+          const other=comparisonOtherSide(c,id);
+          if(!other?.id || shownDupeIds.has(other.id)) continue;
+          const nameKey=normalized(other.brand)+'|'+normalized(other.name);
+          if(moreSeen.has(nameKey)) continue;
+          moreSeen.add(nameKey);
+          moreReady.push({c,other,sim});
+          if(moreReady.length>=MAX_DUPES_PER_DESIGNER) break;
+        }
+        if(moreReady.length){
+          wrap.hidden=false;
+          wrap.innerHTML='<div class="eyebrow">ADDISON ALSO LIKES</div>'+
+            moreReady.map(({c,other,sim})=>
+              '<div class="compare"><h3>'+esc([other.brand,other.name].filter(Boolean).join(' '))+'</h3>'+
+              '<div class="muted">≈ '+Math.round(sim)+'% similar · '+
+              esc(stylistDupeReason(c,{canonical_name:other.name},{canonical_name:p.canonical_name}))+
+              '</div></div>'
+            ).join('');
+        }else{
+          wrap.hidden=true;
+          wrap.replaceChildren();
+        }
       }
     }catch{
       const host=el('dupe-wrap');if(host)host.hidden=true;
