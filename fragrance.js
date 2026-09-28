@@ -133,18 +133,22 @@ async function renderShopLinks(product,host,maxRetailers=2,options={}){
     ? (options.sizeLabel||sizeLabelForBucket(offers,targetSizeBucket))
     : (rows[0]?.sizeLabel||'');
 
-  status.textContent=rows.length
-    ? ((sizeLabel?'MATCHED SIZE · '+sizeLabel+' · ':'')+'price checked within 10 min')
-    : (options.requireMatchedSize
-        ? 'No same-size live partner price right now — no mismatched price shown.'
-        : 'No exact retail-bottle partner price right now — Amazon search is available.');
+  if(rows.length){
+    const retailers=rows.map(x=>String(x.retailer||'partner')).filter(Boolean);
+    status.textContent=(sizeLabel?'MATCHED SIZE · '+sizeLabel+' · ':'')+
+      'checked within 10 min'+(retailers.length?' · available at '+retailers.join(' + '):'');
+  }else if(options.requireMatchedSize){
+    status.textContent='That matched size is not live with my current partners right now, so I am holding the price instead of showing you a mismatched bottle. Amazon is the fallback.';
+  }else{
+    status.textContent='My priority partners do not have a clean live match right now, so I am falling back to Amazon.';
+  }
 
   for(const offer of rows){
     const a=document.createElement('a');
     a.className='compare-shop-link';
     a.href=safeHttps(offer.affiliateUrl);
     a.target='_blank';
-    a.rel='sponsored noopener noreferrer';
+    a.rel='sponsored nofollow noopener noreferrer';
     const n=Number(offer.price);
     a.textContent='SHOP '+String(offer.retailer||'PARTNER').toUpperCase()+
       (offer.sizeLabel?' · '+offer.sizeLabel:'')+
@@ -156,7 +160,7 @@ async function renderShopLinks(product,host,maxRetailers=2,options={}){
   amazon.className='compare-shop-link secondary';
   amazon.href=amazonUrl(product,sizeLabel);
   amazon.target='_blank';
-  amazon.rel='sponsored noopener noreferrer';
+  amazon.rel='sponsored nofollow noopener noreferrer';
   amazon.textContent=options.requireMatchedSize?'CHECK SAME SIZE ON AMAZON':'SHOP ON AMAZON';
   host.appendChild(amazon);
 }
@@ -166,6 +170,45 @@ function noIndex(msg){
   el('fragrance-title').textContent='Fragrance not found';
   el('fragrance-subtitle').textContent=msg;
   el('fragrance-content').innerHTML='<a class="button" href="fragrances.html">BROWSE THE FRAGRANCE CATALOG →</a>';
+}
+
+async function fetchWearDetails(comparisonId){
+  if(!comparisonId)return null;
+  try{
+    const q=new URLSearchParams({
+      select:'comparison_id,opening_comparison,drydown_comparison,performance_comparison',
+      comparison_id:'eq.'+comparisonId,
+      limit:'1'
+    });
+    const rows=await api('/rest/v1/catalog_public_comparison_wear_v1?'+q.toString());
+    return rows[0]||null;
+  }catch{return null}
+}
+
+function stylistWearCopy(kind,value,alternative,designer){
+  let t=String(value||'').replace(/\s+/g,' ').trim();
+  if(!t || /^No separate .* was reported\.?$/i.test(t)) return '';
+  const forbidden=/(owner[- ]?(approved|verified|research)|human research|workbook|csv|database|machine|evidence|source[- ]reported|pipeline|publication|percentage was reported)/i;
+  if(forbidden.test(t)) return '';
+
+  const alt=alternative?.canonical_name||'the alternative';
+  const orig=designer?.canonical_name||'the designer';
+
+  if(kind==='opening'){
+    t=t
+      .replace(/^Both openings meet around (.+?)\.?$/i,(_,notes)=>`They meet quickly around ${notes}, so the first impression stays familiar.`)
+      .replace(/^The openings separate more clearly.*$/i,`The opening is where ${alt} shows more of its own personality, while ${orig} keeps the designer signature more clearly.`);
+  }
+  if(kind==='drydown'){
+    t=t
+      .replace(/^Both drydowns meet around (.+?)\.?$/i,(_,notes)=>`They settle into the same ${notes} direction, which keeps the finish familiar on skin.`)
+      .replace(/^The drydowns separate more clearly than the opening, with different base-note emphasis\.?$/i,`This is where they part ways most: ${alt} shifts into a different base-note balance while ${orig} keeps the original designer finish.`);
+  }
+  if(kind==='performance'){
+    t=t
+      .replace(/^Performance is broadly similar\.?$/i,'Performance stays in a similar lane, so the bigger decision is scent character rather than wear time.');
+  }
+  return t;
 }
 
 function comparisonOtherSide(c,currentId){
@@ -273,6 +316,7 @@ async function renderDesignerDupeSection(product,comparisons){
   const picks=selected.map(x=>x.pick);
   const dupeProducts=selected.map(x=>x.product);
   const selectedDupeSnapshots=selected.map(x=>x.snapshot);
+  const selectedWearSnapshots=await Promise.all(picks.map(x=>fetchWearDetails(x.comparison_id)));
   const matchedSizeLabel=targetSizeBucket!==null
     ? (sizeLabelForBucket(designerSnapshot.deals,targetSizeBucket) ||
        selectedDupeSnapshots.map(s=>sizeLabelForBucket(s.deals,targetSizeBucket)).find(Boolean) ||
@@ -302,7 +346,7 @@ async function renderDesignerDupeSection(product,comparisons){
   const grid=document.createElement('div');
   grid.className='designer-dupe-grid';
 
-  const makeCard=(prod,label,similarity,comparison=null,snapshot=null)=>{
+  const makeCard=(prod,label,similarity,comparison=null,snapshot=null,wear=null)=>{
     const card=document.createElement('article');
     card.className='designer-dupe-card';
 
@@ -348,6 +392,35 @@ async function renderDesignerDupeSection(product,comparisons){
       card.appendChild(whyBox);
     }
 
+    if(comparison && wear){
+      const opening=stylistWearCopy('opening',wear.opening_comparison,prod,product);
+      const drydown=stylistWearCopy('drydown',wear.drydown_comparison,prod,product);
+      const performance=stylistWearCopy('performance',wear.performance_comparison,prod,product);
+      if(opening||drydown||performance){
+        const wearBox=document.createElement('div');
+        wearBox.className='designer-dupe-wear';
+        const wearLabel=document.createElement('b');
+        wearLabel.textContent='HOW IT WEARS';
+        wearBox.appendChild(wearLabel);
+        if(opening){
+          const p=document.createElement('p');
+          p.innerHTML='<strong>Opening:</strong> '+esc(opening);
+          wearBox.appendChild(p);
+        }
+        if(drydown){
+          const p=document.createElement('p');
+          p.innerHTML='<strong>Dry-down:</strong> '+esc(drydown);
+          wearBox.appendChild(p);
+        }
+        if(performance){
+          const p=document.createElement('p');
+          p.innerHTML='<strong>Performance:</strong> '+esc(performance);
+          wearBox.appendChild(p);
+        }
+        card.appendChild(wearBox);
+      }
+    }
+
     const shop=document.createElement('div');
     shop.className='designer-dupe-shop';
     card.appendChild(shop);
@@ -356,14 +429,15 @@ async function renderDesignerDupeSection(product,comparisons){
     return card;
   };
 
-  grid.appendChild(makeCard(product,'DESIGNER',null,null,designerSnapshot));
+  grid.appendChild(makeCard(product,'DESIGNER',null,null,designerSnapshot,null));
   dupeProducts.forEach((prod,index)=>{
     grid.appendChild(makeCard(
       prod,
       index===0?'DUPE':'DUPE OPTION 2',
       picks[index]?.sim,
       picks[index],
-      selectedDupeSnapshots[index]
+      selectedDupeSnapshots[index],
+      selectedWearSnapshots[index]
     ));
   });
 
@@ -390,12 +464,12 @@ async function renderDesignerDupeSection(product,comparisons){
       :([p.canonical_name,'by',p.brand,p.concentration?'('+p.concentration+')':'','with',allNotes.slice(0,8).join(', ')].filter(Boolean).join(' '));
 
     const canonical='https://stylemyscent.com/fragrance.html?id='+encodeURIComponent(id);
-    document.title=name+' | Notes & Similar Scents | Style My Scent';
+    document.title=name+' Dupes & Alternatives | Style My Scent';
     el('fragrance-title').textContent=p.canonical_name;
     el('fragrance-subtitle').textContent=[p.brand,p.concentration,year].filter(Boolean).join(' · ');
-    el('meta-description').content=('Explore '+name+' scent notes, profile, dupes and shopping options with Style My Scent.').slice(0,160);
-    addMeta('#og-title','content',name+' | Style My Scent');
-    addMeta('#og-description','content',desc.slice(0,180));
+    el('meta-description').content=('Love '+name+'? See Addison’s two strongest alternatives, why they work, how the dry-down changes, and current shopping options.').slice(0,160);
+    addMeta('#og-title','content',name+' Dupes & Alternatives | Style My Scent');
+    addMeta('#og-description','content',('See Addison’s closest alternatives to '+name+', what changes on skin, and current shopping options.').slice(0,180));
     addMeta('#og-url','content',canonical);
     setCanonical(canonical);
 
