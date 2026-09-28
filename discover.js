@@ -622,6 +622,28 @@ function notesCard(product,label){
   return card;
 }
 
+function derivedDrydownFromProfiles(original,alternative){
+  const originalBase=Array.isArray(original?.notes?.base)?original.notes.base.filter(Boolean):[];
+  const alternativeBase=Array.isArray(alternative?.notes?.base)?alternative.notes.base.filter(Boolean):[];
+  if(!originalBase.length || !alternativeBase.length) return '';
+
+  const originalMap=new Map(originalBase.map(note=>[normalized(note),note]));
+  const alternativeMap=new Map(alternativeBase.map(note=>[normalized(note),note]));
+  const sharedKeys=[...originalMap.keys()].filter(key=>alternativeMap.has(key));
+  const originalOnly=[...originalMap.entries()].filter(([key])=>!alternativeMap.has(key)).map(([,note])=>note);
+  const alternativeOnly=[...alternativeMap.entries()].filter(([key])=>!originalMap.has(key)).map(([,note])=>note);
+
+  if(sharedKeys.length){
+    const shared=sharedKeys.slice(0,3).map(key=>originalMap.get(key)).join(', ');
+    let copy=`Both settle around ${shared}, which keeps the base familiar.`;
+    if(originalOnly.length) copy+=` The original keeps more ${originalOnly.slice(0,3).join(', ')}.`;
+    if(alternativeOnly.length) copy+=` The alternative leans more into ${alternativeOnly.slice(0,3).join(', ')}.`;
+    return copy;
+  }
+
+  return `The original settles into ${originalBase.slice(0,3).join(', ')}, while the alternative settles into ${alternativeBase.slice(0,3).join(', ')}.`;
+}
+
 async function fetchAffiliateOffers(product){
   const q=[product.brand,product.name,product.concentration].filter(Boolean).join(' ').trim();
   if(!q) return [];
@@ -702,9 +724,9 @@ function renderCompareCard(row,openDetail){
   const originalProduct=productFromComparison(row,'original');
   const alternativeProduct=productFromComparison(row,'alternative');
   const originalKicker=SMS_FAMILIAR_DESIGNER_BRANDS.has(normalized(originalProduct.brand))?'DESIGNER SCENT':'THE SCENT YOU KNOW';
-  pair.appendChild(bottleSide(originalProduct,originalKicker,()=>openDetail(row,'original')));
+  pair.appendChild(bottleSide(originalProduct,originalKicker,()=>openDetail(row)));
   pair.appendChild(textEl('div','web-compare-vs','↔'));
-  pair.appendChild(bottleSide(alternativeProduct,'ONE TO TRY',()=>openDetail(row,'alternative')));
+  pair.appendChild(bottleSide(alternativeProduct,'ONE TO TRY',()=>openDetail(row)));
   card.appendChild(pair);
 
   const similarity=Number(row.estimated_similarity);
@@ -775,6 +797,13 @@ async function renderDetail(row,focusShop=''){
   detail.appendChild(textEl('h3','web-detail-title',[original.name,'↔',alternative.name].filter(Boolean).join(' ')));
   detail.appendChild(textEl('p','web-detail-sub',(Number.isFinite(similarity)?'≈ '+Math.round(similarity)+'% similar. ':'')+'Here is why I paired them, where they differ, and how the opening and dry-down develop.'));
 
+  const pair=document.createElement('div');
+  pair.className='web-compare-pair web-detail-pair';
+  pair.appendChild(bottleSide(original,'DESIGNER SCENT'));
+  pair.appendChild(textEl('div','web-compare-vs','↔'));
+  pair.appendChild(bottleSide(alternative,'ALTERNATIVE'));
+  detail.appendChild(pair);
+
   const summary=document.createElement('div');
   summary.className='web-detail-grid';
 
@@ -792,12 +821,15 @@ async function renderDetail(row,focusShop=''){
 
   detail.appendChild(summary);
 
+  const [originalProfile,alternativeProfile]=await Promise.all([
+    fetchProfile(original),fetchProfile(alternative)
+  ]);
+
   const wear=await fetchPublicWearDetails(row.comparison_id);
-  if(wear){
-    const opening=addisonWearCopy('opening',wear.opening_comparison,row);
-    const drydown=addisonWearCopy('drydown',wear.drydown_comparison,row);
-    const performance=addisonWearCopy('performance',wear.performance_comparison,row);
-    if(opening||drydown||performance){
+  const opening=addisonWearCopy('opening',wear?.opening_comparison,row);
+  const drydown=addisonWearCopy('drydown',wear?.drydown_comparison,row) || derivedDrydownFromProfiles(originalProfile||original,alternativeProfile||alternative);
+  const performance=addisonWearCopy('performance',wear?.performance_comparison,row);
+  if(opening||drydown||performance){
       const wearCard=document.createElement('div');
       wearCard.className='web-detail-card web-wear-card';
       wearCard.style.marginTop='16px';
@@ -820,12 +852,7 @@ async function renderDetail(row,focusShop=''){
       }
       wearCard.appendChild(textEl('p','web-wear-note','Dry-down is the direction I expect from the fragrance as it settles; exact wear can shift with skin chemistry, climate and application.'));
       detail.appendChild(wearCard);
-    }
   }
-
-  const [originalProfile,alternativeProfile]=await Promise.all([
-    fetchProfile(original),fetchProfile(alternative)
-  ]);
 
   const notes=document.createElement('div');
   notes.className='web-detail-grid';
@@ -867,7 +894,7 @@ async function renderDetail(row,focusShop=''){
   requestAnimationFrame(()=>{
     if(focusShop==='alternative') altShop.scrollIntoView({behavior:'smooth',block:'center'});
     else if(focusShop==='original') originalShop.scrollIntoView({behavior:'smooth',block:'center'});
-    else detail.scrollIntoView({behavior:'smooth',block:'start'});
+    else pair.scrollIntoView({behavior:'smooth',block:'start'});
   });
 }
 
