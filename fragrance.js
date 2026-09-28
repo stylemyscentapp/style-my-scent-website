@@ -199,7 +199,7 @@ async function renderDesignerDupeSection(product,comparisons){
   const grid=document.createElement('div');
   grid.className='designer-dupe-grid';
 
-  const makeCard=(prod,label,similarity)=>{
+  const makeCard=(prod,label,similarity,comparison=null)=>{
     const card=document.createElement('article');
     card.className='designer-dupe-card';
 
@@ -234,6 +234,21 @@ async function renderDesignerDupeSection(product,comparisons){
       card.appendChild(score);
     }
 
+    if(comparison){
+      let why=String(comparison.similarities||comparison.verdict||'').replace(/\s+/g,' ').trim();
+      if(!why || /limited shared-note detail|catalog currently|independent comparison evidence|owner research|database|machine/i.test(why)){
+        why='It follows the same overall scent direction and key accord family, making it a strong alternative to the designer.';
+      }
+      const whyBox=document.createElement('div');
+      whyBox.className='designer-dupe-why';
+      const whyLabel=document.createElement('b');
+      whyLabel.textContent="WHY IT'S A GOOD DUPE";
+      const whyText=document.createElement('p');
+      whyText.textContent=why;
+      whyBox.append(whyLabel,whyText);
+      card.appendChild(whyBox);
+    }
+
     const shop=document.createElement('div');
     shop.className='designer-dupe-shop';
     card.appendChild(shop);
@@ -242,9 +257,9 @@ async function renderDesignerDupeSection(product,comparisons){
     return card;
   };
 
-  grid.appendChild(makeCard(product,'DESIGNER',null));
+  grid.appendChild(makeCard(product,'DESIGNER',null,null));
   dupeProducts.forEach((prod,index)=>{
-    grid.appendChild(makeCard(prod,index===0?'DUPE':'DUPE OPTION 2',picks[index]?.sim));
+    grid.appendChild(makeCard(prod,index===0?'DUPE':'DUPE OPTION 2',picks[index]?.sim,picks[index]));
   });
 
   host.appendChild(grid);
