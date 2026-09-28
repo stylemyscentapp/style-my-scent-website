@@ -313,6 +313,32 @@
 
 <script>
 (function(){
+  const SMS_URL='https://kdspdaffkbxxxgxlfnjo.supabase.co';
+  const SMS_KEY='sb_publishable_KCHzj9dxjrN_Jzzo0b1weQ_7LktkdMB';
+
+  async function syncCatalogImages(){
+    const links=[...document.querySelectorAll('.card a.button[href*="fragrance.html?id="]')];
+    const byId=new Map();
+    links.forEach(link=>{
+      const id=new URL(link.href,location.href).searchParams.get('id');
+      if(id) byId.set(id,link.closest('.card'));
+    });
+    const ids=[...byId.keys()];
+    for(let offset=0;offset<ids.length;offset+=50){
+      const scope=ids.slice(offset,offset+50);
+      try{
+        const qs=new URLSearchParams({select:'id,bottle_image_url',id:'in.('+scope.join(',')+')',is_active:'eq.true',verification_status:'eq.verified'});
+        const r=await fetch(SMS_URL+'/rest/v1/fragrances?'+qs.toString(),{headers:{apikey:SMS_KEY}});
+        if(!r.ok) continue;
+        for(const row of await r.json()){
+          const card=byId.get(row.id);
+          const img=card?.querySelector('img');
+          if(img && /^https:\/\//i.test(String(row.bottle_image_url||''))) img.src=row.bottle_image_url;
+        }
+      }catch{}
+    }
+  }
+
   const designerBrands=new Set([
     'azzaro','burberry','bvlgari','calvin klein','carolina herrera','chanel','chloe','coach',
     'dior','dolce & gabbana','dolce and gabbana','giorgio armani','givenchy','gucci','hermes',
@@ -349,6 +375,8 @@
       }
     });
   }
+
+  syncCatalogImages();
 
   document.querySelectorAll('.notes').forEach(host=>{
     const raw=String(host.textContent||'').trim();
