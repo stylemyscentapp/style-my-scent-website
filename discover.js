@@ -412,8 +412,8 @@ async function fetchComparisons(query='',signal){
   // Paint the first useful Discover cards quickly instead of scanning hundreds
   // of rows before the page can render. Search can look deeper because the user
   // is actively asking for a specific bottle or brand.
-  const targetRows=q?200:80;
-  const pageSize=q?100:80;
+  const targetRows=q?120:40;
+  const pageSize=q?60:40;
   const rows=[];
   for(let offset=0;offset<targetRows;offset+=pageSize){
     const params=new URLSearchParams(baseParams);
@@ -1089,10 +1089,25 @@ async function loadStyleMyScentDiscovery(){
   if(!host) return;
   try{
     const select='fragrance_id,brand,canonical_name,concentration,image_url,retailer_name,price,affiliate_url,is_new,reason';
-    const response=await fetch(SMS_SUPABASE_URL+'/rest/v1/catalog_discovery_feed?select='+select+'&order=discovery_score.desc,brand.asc,canonical_name.asc&limit=30',{
-      headers:{apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY},
-    });
-    if(!response.ok) throw new Error('Discovery unavailable');
+    const endpoint=SMS_SUPABASE_URL+'/rest/v1/catalog_discovery_feed?select='+select+'&order=discovery_score.desc,brand.asc,canonical_name.asc&limit=24';
+    let response=null;
+    for(let attempt=0;attempt<2;attempt++){
+      const controller=new AbortController();
+      const timer=setTimeout(()=>controller.abort(),4200);
+      try{
+        response=await fetch(endpoint,{
+          headers:{apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY},
+          signal:controller.signal,
+        });
+        clearTimeout(timer);
+        if(response.ok) break;
+      }catch(error){
+        clearTimeout(timer);
+        if(attempt===1) throw error;
+      }
+      await new Promise(resolve=>setTimeout(resolve,180));
+    }
+    if(!response?.ok) throw new Error('Discovery unavailable');
     const allRows=await response.json();
     const rows=[];
     const seenRetailers=new Set();
@@ -1113,13 +1128,14 @@ async function loadStyleMyScentDiscovery(){
       const card=document.createElement('article');
       card.className='discover-card';
 
-      const imageUrl=safeHttpsUrl(row.image_url);
+      const imageUrl=safeBottleImageUrl(row.image_url);
       if(imageUrl){
         const img=document.createElement('img');
         img.src=imageUrl;
         img.alt=((row.brand || '')+' '+(row.canonical_name || '')).trim() || 'Fragrance bottle';
         img.loading='lazy';
         img.referrerPolicy='no-referrer';
+        img.addEventListener('error',()=>img.replaceWith(textEl('div','discover-fallback','SMS')),{once:true});
         card.appendChild(img);
       }else{
         card.appendChild(textEl('div','discover-fallback','SMS'));
@@ -1165,7 +1181,8 @@ async function loadStyleMyScentDiscovery(){
     });
     if(status) status.textContent=rows.length?'Live partner picks refresh automatically — eCosmetics, FragranceShop.com, Perfumania.com and Amazon shopping options are enabled.':'Discovery is refreshing.';
   }catch{
-    if(status) status.textContent='Discovery is refreshing. The app will always show the newest ready-to-shop picks.';
+    host.replaceChildren();
+    if(status) status.textContent='Live offers are refreshing. You can still shop our verified partner links above.';
   }
 }
 
