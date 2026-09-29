@@ -388,6 +388,7 @@ async function fetchComparisons(query='',signal){
   const baseParams=new URLSearchParams();
   baseParams.set('select',fields);
   baseParams.set('order','verified_at.desc.nullslast,comparison_id');
+  baseParams.set('estimated_similarity','gte.60');
 
   const q=String(query||'').trim().replace(/[*,()%]/g,' ');
   const queryWords=normalized(q).split(' ').filter(Boolean);
@@ -408,10 +409,11 @@ async function fetchComparisons(query='',signal){
     baseParams.set('or','('+filter+')');
   }
 
-  // The public REST endpoint can cap a single response at 100 rows.
-  // Scan enough verified public rows to keep the full 300 customer-ready comparison target filled.
-  const targetRows=900;
-  const pageSize=100;
+  // Paint the first useful Discover cards quickly instead of scanning hundreds
+  // of rows before the page can render. Search can look deeper because the user
+  // is actively asking for a specific bottle or brand.
+  const targetRows=q?200:80;
+  const pageSize=q?100:80;
   const rows=[];
   for(let offset=0;offset<targetRows;offset+=pageSize){
     const params=new URLSearchParams(baseParams);
