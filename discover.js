@@ -295,7 +295,7 @@ async function fetchPublicWearDetails(comparisonId){
       comparison_id:'eq.'+comparisonId,
       limit:'1'
     });
-    const response=await fetch(SMS_SUPABASE_URL+'/rest/v1/catalog_public_comparison_wear_v1?'+params.toString(),{
+    const response=await fetch(SMS_SUPABASE_URL+'/rest/v1/catalog_public_comparison_wear_v3?'+params.toString(),{
       headers:{apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY}
     });
     if(!response.ok) return null;
@@ -417,7 +417,7 @@ async function fetchComparisons(query='',signal){
     const params=new URLSearchParams(baseParams);
     params.set('limit',String(pageSize));
     params.set('offset',String(offset));
-    const response=await fetch(SMS_SUPABASE_URL+'/rest/v1/catalog_discover_comparison_cards_fast_v1?'+params.toString(),{
+    const response=await fetch(SMS_SUPABASE_URL+'/rest/v1/catalog_discover_comparison_cards_fast_v3?'+params.toString(),{
       headers:{apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY},signal
     });
     if(!response.ok) throw new Error('Discover unavailable');
