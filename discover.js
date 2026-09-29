@@ -306,7 +306,7 @@ async function fetchPublicWearDetails(comparisonId){
 function addisonWearCopy(kind,value,row={}){
   let t=String(value||'').replace(/\s+/g,' ').trim();
   if(!t || /^No separate .* was reported\.?$/i.test(t)) return '';
-  const technical=/(owner[- ]?(approved|verified|research)|human research|workbook|csv|database|machine|evidence|source[- ]reported|pipeline|publication|percentage was reported)/i;
+  const technical=/(owner[- ]?(approved|verified|research)|human research|workbook|csv|database|machine|evidence|source[- ]reported|pipeline|publication|percentage was reported|detail is limited|broader profile|remain less certain)/i;
   if(technical.test(t)) return '';
   const alt=String(row.alternative_name||'the alternative').trim();
   const original=String(row.original_name||'the designer').trim();
@@ -578,10 +578,10 @@ async function fetchProfile(product){
     concentration:row.concentration||row.product_type||product.concentration,
     imageUrl:row.bottle_image_url||product.imageUrl,
     notes:{
-      top:pick(row.top_notes,addison?.top_notes,dnotes.top),
-      heart:pick(row.middle_notes,addison?.middle_notes,dnotes.heart),
-      base:pick(row.base_notes,addison?.base_notes,dnotes.base),
-      general:pick(row.fragrance_notes,addison?.general_notes,dnotes.general),
+      top:pick(dnotes.top,row.top_notes,addison?.top_notes),
+      heart:pick(dnotes.heart,row.middle_notes,addison?.middle_notes),
+      base:pick(dnotes.base,row.base_notes,addison?.base_notes),
+      general:pick(dnotes.general,row.fragrance_notes,addison?.general_notes),
       accords:pick(row.accords,addison?.accords,discover?.accords),
     }
   };
@@ -689,6 +689,13 @@ function sideBySideChart(original,alternative){
   return card;
 }
 
+function derivedOpeningFromProfiles(original,alternative){
+  const left=Array.isArray(original?.notes?.top)?original.notes.top.filter(Boolean):[];
+  const right=Array.isArray(alternative?.notes?.top)?alternative.notes.top.filter(Boolean):[];
+  if(!left.length || !right.length) return '';
+  return `${original.name||'The original'} lists ${left.slice(0,4).join(', ')} in its opening; ${alternative.name||'the alternative'} lists ${right.slice(0,4).join(', ')}. These are the published opening notes; their balance on skin can differ.`;
+}
+
 function derivedDrydownFromProfiles(original,alternative){
   const originalBase=Array.isArray(original?.notes?.base)?original.notes.base.filter(Boolean):[];
   const alternativeBase=Array.isArray(alternative?.notes?.base)?alternative.notes.base.filter(Boolean):[];
@@ -702,13 +709,14 @@ function derivedDrydownFromProfiles(original,alternative){
 
   if(sharedKeys.length){
     const shared=sharedKeys.slice(0,3).map(key=>originalMap.get(key)).join(', ');
-    let copy=`Both settle around ${shared}, which keeps the base familiar.`;
-    if(originalOnly.length) copy+=` The original keeps more ${originalOnly.slice(0,3).join(', ')}.`;
-    if(alternativeOnly.length) copy+=` The alternative leans more into ${alternativeOnly.slice(0,3).join(', ')}.`;
+    let copy=`Both list ${shared} in their base notes.`;
+    if(originalOnly.length) copy+=` The original also lists ${originalOnly.slice(0,3).join(', ')}.`;
+    if(alternativeOnly.length) copy+=` The alternative also lists ${alternativeOnly.slice(0,3).join(', ')}.`;
+    copy+=' Shared base notes support the comparison, but do not establish identical dry-down or performance.';
     return copy;
   }
 
-  return `The original settles into ${originalBase.slice(0,3).join(', ')}, while the alternative settles into ${alternativeBase.slice(0,3).join(', ')}.`;
+  return `The original lists ${originalBase.slice(0,3).join(', ')} in its base, while the alternative lists ${alternativeBase.slice(0,3).join(', ')}. Their published base notes differ; a wear comparison is needed to establish how close the dry-down feels.`;
 }
 
 async function fetchAffiliateOffers(product){
@@ -881,7 +889,7 @@ async function renderDetail(row,focusShop=''){
   const chart=sideBySideChart(originalProfile||original,alternativeProfile||alternative);
   if(chart) detail.appendChild(chart);
 
-  const opening=addisonWearCopy('opening',wear?.opening_comparison,row);
+  const opening=addisonWearCopy('opening',wear?.opening_comparison,row) || derivedOpeningFromProfiles(originalProfile||original,alternativeProfile||alternative);
   const drydown=addisonWearCopy('drydown',wear?.drydown_comparison,row) || derivedDrydownFromProfiles(originalProfile||original,alternativeProfile||alternative);
   const summary=document.createElement('div');
   summary.className='web-detail-card web-comparison-details';
