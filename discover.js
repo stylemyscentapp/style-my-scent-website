@@ -376,7 +376,7 @@ async function noteReadyIds(rows=[],signal){
   return ready;
 }
 
-async function fetchComparisons(query='',signal){
+async function fetchComparisons(query='',signal,{offset:sourceOffset=0,pageLimit=null}={}){
   const fields=[
     'comparison_id','fragrance_id','compared_fragrance_id','relationship',
     'estimated_similarity','shared_notes','similarities','differences','verdict',
@@ -413,10 +413,12 @@ async function fetchComparisons(query='',signal){
   // Paint the first useful Discover cards quickly instead of scanning hundreds
   // of rows before the page can render. Search can look deeper because the user
   // is actively asking for a specific bottle or brand.
-  const targetRows=q?120:40;
-  const pageSize=q?60:40;
+  const targetRows=pageLimit||(q?120:40);
+  const pageSize=Math.min(targetRows,q?60:40);
   const rows=[];
-  for(let offset=0;offset<targetRows;offset+=pageSize){
+  let nextOffset=sourceOffset,hasMore=false;
+  const finish=result=>Object.assign(result,{nextOffset,hasMore});
+  for(let offset=sourceOffset;offset<sourceOffset+targetRows;offset+=pageSize){
     const params=new URLSearchParams(baseParams);
     params.set('limit',String(pageSize));
     params.set('offset',String(offset));
@@ -426,6 +428,8 @@ async function fetchComparisons(query='',signal){
     if(!response.ok) throw new Error('Discover unavailable');
     const page=await response.json();
     rows.push(...page);
+    nextOffset=offset+page.length;
+    hasMore=page.length===pageSize;
     if(page.length<pageSize) break;
   }
   const seenPairs=new Set();
@@ -488,17 +492,17 @@ async function fetchComparisons(query='',signal){
         bestByBottle.set(bottleKey,row);
       }
     }
-    return limitTwoPerDesignerBottle([...bestByBottle.values()].sort((a,b)=>Number(b.estimated_similarity)-Number(a.estimated_similarity)));
+    return finish(limitTwoPerDesignerBottle([...bestByBottle.values()].sort((a,b)=>Number(b.estimated_similarity)-Number(a.estimated_similarity))));
   }
 
   if(queryWords.length){
-    return limitTwoPerDesignerBottle([...searchReady].sort((a,b)=>
+    return finish(limitTwoPerDesignerBottle([...searchReady].sort((a,b)=>
       Number(b.estimated_similarity||0)-Number(a.estimated_similarity||0) ||
       String(b.verified_at||'').localeCompare(String(a.verified_at||''))
-    ));
+    )));
   }
 
-  return limitTwoPerDesignerBottle(rankHomepageComparisons(websiteReady)).slice(0,300);
+  return finish(limitTwoPerDesignerBottle(rankHomepageComparisons(websiteReady)));
 }
 
 const SMS_COMPACT_PROFILE_CACHE=new Map();
@@ -724,17 +728,30 @@ async function fetchAffiliateOffers(product){
   const q=[product.brand,product.name,product.concentration].filter(Boolean).join(' ').trim();
   if(!q) return [];
   try{
+    const directRequest=product.id?fetch(SMS_SUPABASE_URL+'/rest/v1/retailer_offers?select=retailer_name,product_title,concentration,size_ml,price,currency,affiliate_url,product_url&fragrance_id=eq.'+encodeURIComponent(product.id)+'&verified=eq.true&in_stock=eq.true&order=price.asc&limit=50',{headers:{apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY}}).then(async r=>r.ok?await r.json():[]).catch(()=>[]):Promise.resolve([]);
     const response=await fetch(SMS_CJ_URL+'?q='+encodeURIComponent(q)+'&channel=website',{
       headers:{apikey:SMS_SUPABASE_KEY,Accept:'application/json'}
-    });
-    if(!response.ok) return [];
-    const data=await response.json();
+    }).catch(()=>({ok:false}));
+    const data=response.ok?await response.json():{};
+    const direct=await directRequest;
     const nameTokens=normalized(product.name).split(' ').filter(x=>x.length>2);
     const brandTokens=normalized(product.brand).split(' ').filter(x=>x.length>2);
-    return (data.deals||[]).filter(deal=>{
+    const concentrationKey=value=>{
+      const s=String(value||'').toLowerCase();
+      if(/eau\s*de\s*toilette|\bedt\b/.test(s)) return 'edt';
+      if(/extrait/.test(s)) return 'extrait';
+      if(/eau\s*de\s*parfum|\bedp\b/.test(s)) return 'edp';
+      if(/\bparfum\b/.test(s)) return 'parfum';
+      if(/eau\s*de\s*cologne|\bedc\b/.test(s)) return 'edc';
+      return '';
+    };
+    const wanted=concentrationKey(product.concentration);
+    const exact=direct.filter(offer=>!wanted||concentrationKey(offer.concentration||offer.product_title)===wanted).map(offer=>({title:offer.product_title,retailer:offer.retailer_name,price:Number(offer.price),currency:offer.currency,sizeMl:Number(offer.size_ml)||null,saleVariant:/tester/i.test(offer.product_title||'')?'Tester':'Retail bottle',affiliateUrl:offer.affiliate_url||offer.product_url}));
+    const cj=(data.deals||[]).filter(deal=>{
       const hay=normalized((deal.title||'')+' '+(deal.description||''));
-      return nameTokens.every(t=>hay.includes(t)) && brandTokens.every(t=>hay.includes(t)) && deal.saleVariant==='Retail bottle' && safeHttpsUrl(deal.affiliateUrl);
-    }).sort((a,b)=>Number(a.price||0)-Number(b.price||0));
+      return nameTokens.every(t=>hay.includes(t)) && brandTokens.every(t=>hay.includes(t)) && (!wanted||concentrationKey((deal.title||'')+' '+(deal.description||''))===wanted) && ['Retail bottle','Tester'].includes(deal.saleVariant) && safeHttpsUrl(deal.affiliateUrl);
+    });
+    return [...new Map([...exact,...cj].filter(o=>Number(o.price)>0 && safeHttpsUrl(o.affiliateUrl)).map(o=>[o.affiliateUrl,o])).values()].sort((a,b)=>Number(a.price)-Number(b.price));
   }catch{
     return [];
   }
@@ -757,13 +774,13 @@ async function renderShop(product,host){
   if(offers.length){
     const byRetailer=new Map();
     for(const offer of offers){
-      const key=normalized(offer.retailer||offer.advertiserId||'retailer');
+      const key=[normalized(offer.retailer||offer.advertiserId||'retailer'),offer.sizeMl||offer.size||'size unlisted',offer.saleVariant||'Retail bottle'].join('|');
       const existing=byRetailer.get(key);
       if(!existing || Number(offer.price)<Number(existing.price)) byRetailer.set(key,offer);
     }
-    const liveRetailers=[...byRetailer.values()].map(x=>String(x.retailer||'partner'));
-    host.appendChild(textEl('div','web-shop-status','I found a live retail-bottle match'+(liveRetailers.length?' at '+liveRetailers.join(' + '):'')+'. If one partner sells out, I keep the next available partner here and leave Amazon as the fallback.'));
-    [...byRetailer.values()].slice(0,4).forEach(offer=>{
+    const liveRetailers=[...new Set([...byRetailer.values()].map(x=>String(x.retailer||'partner')))];
+    host.appendChild(textEl('div','web-shop-status','Available offers for this bottle at '+liveRetailers.join(' + ')+'. Compare the size and tester label before comparing prices.'));
+    [...byRetailer.values()].forEach(offer=>{
       const row=document.createElement('div');
       row.className='web-shop-offer';
       const a=document.createElement('a');
@@ -772,8 +789,9 @@ async function renderShop(product,host){
       a.rel='sponsored nofollow noopener noreferrer';
       a.textContent='SHOP AT '+String(offer.retailer||'PARTNER').toUpperCase();
       row.appendChild(a);
+      row.appendChild(textEl('div','',[offer.sizeMl?offer.sizeMl+' mL':(offer.size||'Size not listed'),offer.saleVariant||'Retail bottle'].join(' • ')));
       const price=Number(offer.price);
-      row.appendChild(textEl('div','web-shop-price',Number.isFinite(price)&&price>0?'$'+price.toFixed(2):'View price'));
+      row.appendChild(textEl('div','web-shop-price',Number.isFinite(price)&&price>0?(offer.currency||'USD')+' '+price.toFixed(2):'View price'));
       host.appendChild(row);
     });
   }else{
@@ -969,7 +987,7 @@ async function loadFullWebsiteDiscover(){
   const example=document.getElementById('website-discover-example');
   if(!input||!grid||!status||!more) return;
 
-  const state={rows:[],visible:8,request:0,controller:null};
+  const state={rows:[],visible:8,request:0,controller:null,nextOffset:0,hasMore:false,loadingMore:false};
   window.__smsDiscoverState=state;
 
   const paint=()=>{
@@ -989,9 +1007,9 @@ async function loadFullWebsiteDiscover(){
     }
     hydrateCompactNotes(state.rows.slice(0,state.visible));
     status.textContent=rendered
-      ? 'I found '+state.rows.length+' match'+(state.rows.length===1?'':'es')+' for you'
+      ? 'Showing '+Math.min(state.visible,state.rows.length)+' of '+state.rows.length+' loaded matches'+(state.hasMore?' • more available':'')
       : (input.value.trim()?'I’m not seeing a match I’d feel good showing you yet. Try another spelling, bottle, or brand.':'I don’t have a match I want to put in front of you right now.');
-    more.hidden=state.visible>=state.rows.length;
+    more.hidden=state.visible>=state.rows.length && !state.hasMore;
   };
 
   const refresh=async()=>{
@@ -1007,6 +1025,8 @@ async function loadFullWebsiteDiscover(){
       if(request!==state.request) return false;
       state.rows=rows;
       state.visible=8;
+      state.nextOffset=rows.nextOffset||0;
+      state.hasMore=Boolean(rows.hasMore);
       paint();
       return true;
     };
@@ -1037,9 +1057,21 @@ async function loadFullWebsiteDiscover(){
     clearTimeout(timer);
     timer=setTimeout(refresh,260);
   });
-  more.addEventListener('click',()=>{
-    state.visible+=8;
-    paint();
+  more.addEventListener('click',async()=>{
+    if(state.loadingMore) return;
+    const request=state.request;
+    state.loadingMore=true; more.disabled=true;
+    try{
+      if(state.visible>=state.rows.length && state.hasMore){
+        const next=await fetchComparisons(input.value.trim(),state.controller?.signal,{offset:state.nextOffset,pageLimit:40});
+        if(request!==state.request) return;
+        state.nextOffset=next.nextOffset; state.hasMore=next.hasMore;
+        state.rows=[...new Map([...state.rows,...next].map(row=>[row.comparison_id,row])).values()];
+      }
+      state.visible+=8;
+      paint();
+    }catch(error){if(error?.name!=='AbortError') status.textContent='I couldn’t load the next matches. Try Show me more again.';}
+    finally{state.loadingMore=false;more.disabled=false;}
   });
 
   if(example){
@@ -1053,13 +1085,63 @@ async function loadFullWebsiteDiscover(){
   await refresh();
 }
 
-async function loadStyleMyScentDiscovery(){
+async function openDealDetail(row){
+  const grid=document.getElementById('live-deal-grid');
+  let detail=document.getElementById('website-deal-detail');
+  if(!detail){detail=document.createElement('div');detail.id='website-deal-detail';detail.className='web-discover-detail';grid.after(detail);}
+  const request=String(row.fragrance_id);
+  detail.dataset.fragranceId=request;
+  detail.hidden=false;detail.replaceChildren();
+  const back=buttonEl('‹ BACK TO DEALS','web-detail-back');
+  back.addEventListener('click',()=>{detail.hidden=true;grid.hidden=false;grid.scrollIntoView({behavior:'smooth',block:'start'});});
+  detail.appendChild(back);
+  grid.hidden=true;
+  const product={id:row.fragrance_id,brand:row.brand,name:row.canonical_name,concentration:row.concentration,imageUrl:row.image_url};
+  detail.appendChild(textEl('h2','',[product.brand,product.name].filter(Boolean).join(' ')));
+  const loading=textEl('p','web-shop-status','Loading this bottle’s notes, matches and retailer offers…');detail.appendChild(loading);
+  detail.scrollIntoView({behavior:'smooth',block:'start'});
+  try{
+    const [profile,comparisons]=await Promise.all([fetchProfile(product),fetchComparisons(product.name).catch(()=>[])]);
+    if(detail.dataset.fragranceId!==request) return;
+    loading.remove();
+    detail.appendChild(notesCard(profile||product,'BOTTLE NOTES'));
+    const shops=document.createElement('div');shops.className='web-detail-card';
+    shops.appendChild(textEl('h3','','Compare retailer offers'));
+    const shopHost=document.createElement('div');shops.appendChild(shopHost);detail.appendChild(shops);
+    renderShop(profile||product,shopHost);
+    const matches=comparisons.filter(c=>c.fragrance_id===product.id||c.compared_fragrance_id===product.id);
+    detail.appendChild(textEl('h3','','Available fragrance comparisons'));
+    if(!matches.length) detail.appendChild(textEl('p','','No published comparison is available for this exact bottle yet.'));
+    for(const match of matches){
+      const other=productFromComparison(match,match.fragrance_id===product.id?'original':'alternative');
+      const button=buttonEl([other.brand,other.name].filter(Boolean).join(' ')+' — ≈ '+Math.round(Number(match.estimated_similarity))+'% • VIEW COMPARISON');
+      button.style.marginBottom='12px';
+      button.addEventListener('click',()=>renderDetail(match));
+      detail.appendChild(button);
+    }
+  }catch{loading.textContent='I couldn’t load this bottle’s details. Close this view and try again.';}
+}
+
+const SMS_DEALS_STATE={visible:8,request:0};
+async function loadStyleMyScentDiscovery({more=false}={}){
   const host=document.getElementById('live-deal-grid');
   const status=document.getElementById('live-deal-status');
   if(!host) return;
+  SMS_DEALS_STATE.visible=more?SMS_DEALS_STATE.visible+8:8;
+  const request=++SMS_DEALS_STATE.request;
+  const limit=SMS_DEALS_STATE.visible+16;
+  let search=document.getElementById('website-deals-search');
+  if(!search){
+    search=document.createElement('input');search.id='website-deals-search';search.type='search';search.className='web-discover-search';search.placeholder='Find a deal by bottle or brand';search.setAttribute('aria-label','Search fragrance deals');host.before(search);
+    let timer;search.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(()=>loadStyleMyScentDiscovery(),260);});
+  }
+  const query=String(search.value||'').trim().replace(/[*,()%]/g,' ');
   try{
     const select='fragrance_id,brand,canonical_name,concentration,image_url,retailer_name,price,affiliate_url,is_new,reason';
-    const endpoint=SMS_SUPABASE_URL+'/rest/v1/catalog_discovery_feed?select='+select+'&order=discovery_score.desc,brand.asc,canonical_name.asc&limit=24';
+    const tokens=normalized(query).split(' ').filter(Boolean);
+    const term=[...tokens].sort((a,b)=>b.length-a.length)[0];
+    const filter=term?'&or='+encodeURIComponent('(brand.ilike.*'+term+'*,canonical_name.ilike.*'+term+'*)'):'';
+    const endpoint=SMS_SUPABASE_URL+'/rest/v1/catalog_discovery_feed?select='+select+'&order=discovery_score.desc,brand.asc,canonical_name.asc,fragrance_id&limit='+limit+filter;
     let response=null;
     for(let attempt=0;attempt<2;attempt++){
       const controller=new AbortController();
@@ -1079,9 +1161,10 @@ async function loadStyleMyScentDiscovery(){
     }
     if(!response?.ok) throw new Error('Discovery unavailable');
     const allRows=await response.json();
+    if(request!==SMS_DEALS_STATE.request) return;
     const rows=[];
     const designerBrands=new Set(['dior','calvin klein','coach','giorgio armani','issey miyake','mugler','rabanne','paco rabanne','versace','azzaro','dolce & gabbana','gucci','givenchy','burberry','chanel','tom ford','prada','yves saint laurent','valentino','jean paul gaultier','marc jacobs','hugo boss','jimmy choo','bvlgari','boucheron','ralph lauren','hermes','hermès']);
-    const eligibleRows=allRows.filter(row=>Number.isFinite(Number(row.price)) && Number(row.price)>0 && safeHttpsUrl(row.affiliate_url));
+    const eligibleRows=allRows.filter(row=>Number.isFinite(Number(row.price)) && Number(row.price)>0 && safeHttpsUrl(row.affiliate_url) && tokens.every(token=>normalized(row.brand+' '+row.canonical_name).includes(token)));
     // Reserve half the showcase for designers before discovery scores fill it.
     for(const row of eligibleRows.filter(row=>designerBrands.has(String(row.brand||'').trim().toLowerCase())).slice(0,4)) rows.push(row);
     const seenRetailers=new Set();
@@ -1094,12 +1177,11 @@ async function loadStyleMyScentDiscovery(){
       }
     }
     for(const row of eligibleRows){
-      if(rows.length>=8) break;
       if(!rows.includes(row)) rows.push(row);
     }
     host.replaceChildren();
 
-    rows.slice(0,8).forEach(row=>{
+    rows.slice(0,SMS_DEALS_STATE.visible).forEach(row=>{
       const card=document.createElement('article');
       card.className='discover-card';
 
@@ -1125,7 +1207,10 @@ async function loadStyleMyScentDiscovery(){
       const detail=(row.concentration || 'Fragrance')+(Number.isFinite(price)?' • from $'+price.toFixed(2):'');
       copy.appendChild(textEl('p','',detail));
       copy.appendChild(textEl('span','',row.retailer_name || 'Retailer offer'));
-      copy.appendChild(textEl('span','','Paid links • commissions may be earned'));
+      const disclosure=textEl('span','','Paid links • commissions may be earned');disclosure.style.display='block';copy.appendChild(disclosure);
+      const view=buttonEl('VIEW NOTES, MATCHES & RETAILERS');
+      view.setAttribute('aria-label','View notes, matches and retailers for '+row.brand+' '+row.canonical_name);
+      view.addEventListener('click',()=>openDealDetail(row));copy.appendChild(view);
 
       const affiliateUrl=safeHttpsUrl(row.affiliate_url);
       if(affiliateUrl){
@@ -1154,7 +1239,10 @@ async function loadStyleMyScentDiscovery(){
       card.appendChild(copy);
       host.appendChild(card);
     });
-    if(status) status.textContent=rows.length?'Live partner picks refresh automatically — eCosmetics, FragranceShop.com, Perfumania.com and Amazon shopping options are enabled.':'Discovery is refreshing.';
+    let moreButton=document.getElementById('website-deals-more');
+    if(!moreButton){moreButton=buttonEl('SHOW MORE DEALS');moreButton.id='website-deals-more';host.after(moreButton);moreButton.addEventListener('click',async()=>{moreButton.disabled=true;await loadStyleMyScentDiscovery({more:true});moreButton.disabled=false;});}
+    moreButton.hidden=rows.length<=SMS_DEALS_STATE.visible && allRows.length<limit;
+    if(status) status.textContent=rows.length?'Showing '+Math.min(rows.length,SMS_DEALS_STATE.visible)+' loaded offers. Open a bottle to view notes, comparisons and retailer options.':'No matching live offers found. Try another bottle or brand.';
   }catch{
     host.replaceChildren();
     if(status) status.textContent='Live offers are refreshing. You can still shop our verified partner links above.';
