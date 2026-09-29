@@ -622,6 +622,71 @@ function notesCard(product,label){
   return card;
 }
 
+function sideBySideChart(original,alternative){
+  const rows=[
+    ['Opening','top'],
+    ['Heart','heart'],
+    ['Dry-down','base'],
+    ['Accords','accords'],
+  ].map(([label,key])=>{
+    const left=Array.isArray(original?.notes?.[key])?original.notes[key].filter(Boolean).slice(0,5):[];
+    const right=Array.isArray(alternative?.notes?.[key])?alternative.notes[key].filter(Boolean).slice(0,5):[];
+    return {label,left,right};
+  }).filter(row=>row.left.length||row.right.length);
+  if(!rows.length) return null;
+
+  const card=document.createElement('div');
+  card.className='web-detail-card';
+  card.style.marginTop='16px';
+  card.appendChild(textEl('div','web-compare-kicker','SIDE-BY-SIDE'));
+  card.appendChild(textEl('h3','','Original vs alternative'));
+
+  const grid=document.createElement('div');
+  grid.style.marginTop='12px';
+  grid.style.border='1px solid rgba(241,212,154,.16)';
+  grid.style.borderRadius='16px';
+  grid.style.overflow='hidden';
+
+  const makeRow=(stage,left,right,header=false)=>{
+    const row=document.createElement('div');
+    row.style.display='grid';
+    row.style.gridTemplateColumns='78px minmax(0,1fr) minmax(0,1fr)';
+    row.style.borderTop=header?'0':'1px solid rgba(241,212,154,.13)';
+    row.style.alignItems='stretch';
+
+    const stageCell=textEl('div','',stage);
+    stageCell.style.padding='10px 8px';
+    stageCell.style.fontSize='10px';
+    stageCell.style.fontWeight='800';
+    stageCell.style.color='var(--gold2)';
+    stageCell.style.background='rgba(241,212,154,.035)';
+    row.appendChild(stageCell);
+
+    [left,right].forEach(value=>{
+      const cell=textEl('div','',value);
+      cell.style.padding='10px 9px';
+      cell.style.fontSize=header?'11px':'12px';
+      cell.style.lineHeight='1.45';
+      cell.style.fontWeight=header?'800':'500';
+      cell.style.color=header?'var(--cream)':'#e4d6c5';
+      cell.style.textAlign='center';
+      cell.style.overflowWrap='anywhere';
+      row.appendChild(cell);
+    });
+    return row;
+  };
+
+  grid.appendChild(makeRow('',original?.name||'Original',alternative?.name||'Alternative',true));
+  rows.forEach(row=>grid.appendChild(makeRow(
+    row.label,
+    row.left.length?row.left.join(' · '):'—',
+    row.right.length?row.right.join(' · '):'—'
+  )));
+  card.appendChild(grid);
+  card.appendChild(textEl('p','web-wear-note','A quick structural view of where the two scents line up and where they separate.'));
+  return card;
+}
+
 function derivedDrydownFromProfiles(original,alternative){
   const originalBase=Array.isArray(original?.notes?.base)?original.notes.base.filter(Boolean):[];
   const alternativeBase=Array.isArray(alternative?.notes?.base)?alternative.notes.base.filter(Boolean):[];
@@ -824,6 +889,9 @@ async function renderDetail(row,focusShop=''){
   const [originalProfile,alternativeProfile]=await Promise.all([
     fetchProfile(original),fetchProfile(alternative)
   ]);
+
+  const chart=sideBySideChart(originalProfile||original,alternativeProfile||alternative);
+  if(chart) detail.appendChild(chart);
 
   const wear=await fetchPublicWearDetails(row.comparison_id);
   const opening=addisonWearCopy('opening',wear?.opening_comparison,row);
