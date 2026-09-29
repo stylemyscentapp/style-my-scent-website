@@ -23,19 +23,12 @@ section{padding:36px 0;border-top:1px solid rgba(255,255,255,.06)}#how{padding-b
 .addison-visual-head{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:18px}
 .addison-visual-head h3{font:600 clamp(30px,3vw,44px)/1.02 "Cormorant Garamond",serif;margin:5px 0 8px}
 .addison-visual-head p{margin:0;color:var(--muted);font-size:14px;line-height:1.6;max-width:720px}
-.app-preview-reel{display:grid;grid-template-columns:1.35fr 1fr 1fr 1fr;gap:12px;align-items:stretch}
-.app-preview-frame{margin:0;border:1px solid rgba(241,212,154,.18);border-radius:18px;overflow:hidden;background:#100e0c;min-width:0;position:relative}
-.app-preview-frame img{width:100%;height:260px;object-fit:cover;background:#111}
-.app-preview-main img{object-position:center top}
-.app-preview-frame figcaption{padding:13px 14px 15px;display:flex;flex-direction:column;gap:4px}
-.app-preview-frame figcaption strong{font:600 21px/1.05 "Cormorant Garamond",serif;color:var(--cream)}
-.app-preview-frame figcaption span{font-size:11px;line-height:1.45;color:var(--muted)}
-.app-preview-points{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+.app-preview-points{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}.app-preview-points-primary{grid-template-columns:repeat(4,1fr);margin-top:4px;margin-bottom:8px}.app-preview-points-primary span{border:1px solid rgba(241,212,154,.16);border-radius:16px;padding:16px;background:#100e0c}
 .app-preview-points span{display:flex;flex-direction:column;gap:3px;border-top:1px solid rgba(241,212,154,.16);padding:12px 4px 2px}
 .app-preview-points strong{color:var(--gold2);font-size:12px;letter-spacing:.03em}
 .app-preview-points small{color:var(--muted);font-size:11px;line-height:1.45}
-@media(max-width:900px){.app-preview-reel{grid-template-columns:1fr 1fr}.app-preview-frame img{height:230px}.app-preview-points{grid-template-columns:1fr}.addison-visual-head{flex-direction:column}}
-@media(max-width:540px){.addison-visual-showcase{padding:18px 14px}.app-preview-reel{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:5px}.app-preview-frame{flex:0 0 82%;scroll-snap-align:start}.app-preview-frame img{height:300px}.app-preview-points{margin-top:8px}}
+@media(max-width:900px){.app-preview-points{grid-template-columns:1fr 1fr}.addison-visual-head{flex-direction:column}}
+@media(max-width:540px){.addison-visual-showcase{padding:18px 14px}.app-preview-points{grid-template-columns:1fr;margin-top:8px}}
 .addison-layer-preview{max-width:980px;margin:24px auto 0;border:1px solid rgba(241,212,154,.32);border-radius:24px;background:linear-gradient(145deg,rgba(208,171,109,.10),rgba(255,255,255,.025));padding:28px;box-shadow:0 20px 50px #0006}
 .addison-layer-preview-head{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:22px}
 .addison-layer-preview-head h3{font:600 clamp(30px,3vw,42px)/1.02 "Cormorant Garamond",serif;margin:5px 0 8px}
@@ -133,23 +126,11 @@ footer{border-top:1px solid var(--line);padding:38px 0 48px;color:#9f9589;font-s
     <div class="addison-layer-badge">APP PREVIEW</div>
   </div>
 
-  <div class="app-preview-reel">
-    <figure class="app-preview-frame app-preview-main">
-      <img src="addison-app.jpg?v=20260929-2" alt="Addison, the Style My Scent fragrance stylist" loading="lazy" decoding="async">
-      <figcaption><strong>Meet Addison</strong><span>Your fragrance stylist inside the app.</span></figcaption>
-    </figure>
-    <figure class="app-preview-frame">
-      <img src="assets/step-3-style.jpg?v=20260929-2" alt="Style My Scent styling visual" loading="lazy" decoding="async">
-      <figcaption><strong>Choose the direction</strong><span>Mood, scent direction, plans and weather shape the pick.</span></figcaption>
-    </figure>
-    <figure class="app-preview-frame">
-      <img src="assets/step-2-layer.jpg?v=20260929-2" alt="Style My Scent fragrance layering visual" loading="lazy" decoding="async">
-      <figcaption><strong>Layer it your way</strong><span>One fragrance, two fragrances, or a full layer from what you own.</span></figcaption>
-    </figure>
-    <figure class="app-preview-frame">
-      <img src="assets/style-my-scent-perfect-layer.jpg?v=20260929-2" alt="Style My Scent layered fragrance styling" loading="lazy" decoding="async">
-      <figcaption><strong>Keep control</strong><span>Skip a step, swap one product, or ask Addison for another option.</span></figcaption>
-    </figure>
+  <div class="app-preview-points app-preview-points-primary">
+    <span><strong>Meet Addison</strong><small>Your fragrance stylist inside the app.</small></span>
+    <span><strong>Choose the direction</strong><small>Mood, scent direction, plans and weather shape the pick.</small></span>
+    <span><strong>Layer it your way</strong><small>One fragrance, two fragrances, or a full layer from what you own.</small></span>
+    <span><strong>Keep control</strong><small>Skip a step, swap one product, or ask Addison for another option.</small></span>
   </div>
 
   <div class="app-preview-points">
