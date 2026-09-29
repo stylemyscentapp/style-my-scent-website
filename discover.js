@@ -231,14 +231,15 @@ function addisonComparisonCopy(kind,value,row={}){
   const technical=/(owner[- ]?(approved|verified|research)|human research|workbook|csv|database|machine|evidence|source[- ]reported|source provides|catalog currently|still gathering|resolution file|supplied snapshot|pipeline|publication)/i;
 
   if(kind==='same'){
+    if(copy && !technical.test(copy)) return copy;
     if(shared.length){
-      return `What makes this match work is the overlap in ${humanList(shared.slice(0,5))}. That shared structure keeps ${alt} close to ${original}'s signature instead of merely landing in the same fragrance family.`;
+      return `They both list ${humanList(shared.slice(0,5))}. Those shared notes give you a useful starting point for comparing the bottles alongside their differences below.`;
     }
     if(technical.test(copy)){
       if(Number.isFinite(similarity)&&similarity>=90){
-        return `${alt} keeps the recognizable shape and mood of ${original} remarkably well. At about ${Math.round(similarity)}% similarity, this reads as a true alternative, not just a fragrance with a few notes in common.`;
+        return `${alt} is listed as an alternative to ${original}, with a catalog similarity estimate of about ${Math.round(similarity)}%. Compare the notes and differences below before choosing.`;
       }
-      return `${alt} stays in the same recognizable scent direction as ${original}, with enough structural overlap to feel familiar from the opening through the drydown.`;
+      return `${alt} is listed as an alternative to ${original}. Compare their published notes and differences below; opening and dry-down resemblance need bottle-specific support.`;
     }
     copy=copy
       .replace(/^Both profiles share (.+?), keeping the overall scent direction closely related\.?$/i,
@@ -250,7 +251,7 @@ function addisonComparisonCopy(kind,value,row={}){
 
   if(kind==='different'){
     if(technical.test(copy)){
-      return `The difference is mostly in polish and texture. ${alt} keeps its own personality in the supporting notes and drydown, while ${original} holds onto the smoother designer finish.`;
+      return `Compare the two note profiles below for their listed differences. A difference in smoothness, intensity or wear cannot be established from the note lists alone.`;
     }
     copy=copy
       .replace(/^The Middle Eastern fragrance emphasizes (.+?), while the designer reference emphasizes (.+?)\.?$/i,
