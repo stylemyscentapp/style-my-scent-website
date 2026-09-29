@@ -878,7 +878,7 @@ async function renderDetail(row,focusShop=''){
     detail.replaceChildren();
     if(grid) grid.hidden=false;
     const state=window.__smsDiscoverState;
-    if(more && state) more.hidden=state.visible>=state.rows.length;
+    if(more && state) more.hidden=state.visible>=state.rows.length && !state.hasMore;
     document.getElementById('discover')?.scrollIntoView({behavior:'smooth',block:'start'});
   });
   detail.appendChild(back);
@@ -1066,7 +1066,7 @@ async function loadFullWebsiteDiscover(){
         const next=await fetchComparisons(input.value.trim(),state.controller?.signal,{offset:state.nextOffset,pageLimit:40});
         if(request!==state.request) return;
         state.nextOffset=next.nextOffset; state.hasMore=next.hasMore;
-        state.rows=[...new Map([...state.rows,...next].map(row=>[row.comparison_id,row])).values()];
+        state.rows=limitTwoPerDesignerBottle([...new Map([...state.rows,...next].map(row=>[row.comparison_id,row])).values()]);
       }
       state.visible+=8;
       paint();
