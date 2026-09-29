@@ -1071,15 +1071,20 @@ async function loadStyleMyScentDiscovery(){
     if(!response?.ok) throw new Error('Discovery unavailable');
     const allRows=await response.json();
     const rows=[];
+    const designerBrands=new Set(['dior','calvin klein','coach','giorgio armani','issey miyake','mugler','rabanne','paco rabanne','versace','azzaro','dolce & gabbana','gucci','givenchy','burberry','chanel','tom ford','prada','yves saint laurent','valentino','jean paul gaultier','marc jacobs','hugo boss','jimmy choo','bvlgari','boucheron','ralph lauren','hermes','hermès']);
+    const eligibleRows=allRows.filter(row=>Number.isFinite(Number(row.price)) && Number(row.price)>0 && safeHttpsUrl(row.affiliate_url));
+    // Reserve half the showcase for designers before discovery scores fill it.
+    for(const row of eligibleRows.filter(row=>designerBrands.has(String(row.brand||'').trim().toLowerCase())).slice(0,4)) rows.push(row);
     const seenRetailers=new Set();
-    for(const row of allRows){
+    for(const row of eligibleRows){
+      if(rows.length>=8) break;
       const retailer=String(row.retailer_name || '').toLowerCase();
-      if(retailer && !seenRetailers.has(retailer)){
+      if(retailer && !seenRetailers.has(retailer) && !rows.includes(row)){
         rows.push(row);
         seenRetailers.add(retailer);
       }
     }
-    for(const row of allRows){
+    for(const row of eligibleRows){
       if(rows.length>=8) break;
       if(!rows.includes(row)) rows.push(row);
     }
@@ -1110,7 +1115,7 @@ async function loadStyleMyScentDiscovery(){
       const price=Number(row.price);
       const detail=(row.concentration || 'Fragrance')+(Number.isFinite(price)?' • from $'+price.toFixed(2):'');
       copy.appendChild(textEl('p','',detail));
-      copy.appendChild(textEl('span','','Ready to style • shop this match'));
+      copy.appendChild(textEl('span','',row.retailer_name || 'Retailer offer'));
       copy.appendChild(textEl('span','','Paid links • commissions may be earned'));
 
       const affiliateUrl=safeHttpsUrl(row.affiliate_url);
