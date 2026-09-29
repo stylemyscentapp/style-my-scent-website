@@ -1093,7 +1093,7 @@ async function loadStyleMyScentDiscovery(){
       card.appendChild(copy);
       host.appendChild(card);
     });
-    if(status) status.textContent=rows.length?'Live partner picks refresh automatically — eCosmetics, FragranceShop.com and Amazon shopping options are enabled.':'Discovery is refreshing.';
+    if(status) status.textContent=rows.length?'Live partner picks refresh automatically — eCosmetics, FragranceShop.com, Perfumania.com and Amazon shopping options are enabled.':'Discovery is refreshing.';
   }catch{
     if(status) status.textContent='Discovery is refreshing. The app will always show the newest ready-to-shop picks.';
   }
