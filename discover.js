@@ -860,9 +860,8 @@ async function renderDetail(row,focusShop=''){
   const alternative=productFromComparison(row,'alternative');
   const similarity=Number(row.estimated_similarity);
 
-  detail.appendChild(textEl('div','web-compare-kicker','DISCOVER YOUR NEXT SCENT'));
-  detail.appendChild(textEl('h3','web-detail-title',[original.name,'↔',alternative.name].filter(Boolean).join(' ')));
-  detail.appendChild(textEl('p','web-detail-sub',(Number.isFinite(similarity)?'≈ '+Math.round(similarity)+'% similar. ':'')+'Here is why I paired them, where they differ, and how the opening and dry-down develop.'));
+  const relationship=String(row.relationship||'').toLowerCase();
+  detail.appendChild(textEl('div','web-compare-kicker',/inspired|dupe/.test(relationship)?'INSPIRED BY / DUPE':(relationship||'SIMILAR SCENT').replace(/_/g,' ').toUpperCase()));
 
   const pair=document.createElement('div');
   pair.className='web-compare-pair web-detail-pair';
@@ -871,73 +870,35 @@ async function renderDetail(row,focusShop=''){
   pair.appendChild(bottleSide(alternative,'ALTERNATIVE'));
   detail.appendChild(pair);
 
-  const summary=document.createElement('div');
-  summary.className='web-detail-grid';
+  if(Number.isFinite(similarity)){
+    detail.appendChild(textEl('div','web-compare-score','≈ '+Math.round(similarity)+'% SIMILAR'));
+  }
 
-  const same=document.createElement('div');
-  same.className='web-detail-card';
-  same.appendChild(textEl('h3','','Why I paired them'));
-  same.appendChild(textEl('p','',addisonComparisonCopy('same',row.similarities,row)||'I paired these because the scent signature stays recognizably close, not because of a loose note overlap.'));
-  summary.appendChild(same);
-
-  const diff=document.createElement('div');
-  diff.className='web-detail-card';
-  diff.appendChild(textEl('h3','',"Where they differ"));
-  diff.appendChild(textEl('p','',addisonComparisonCopy('different',row.differences,row)||'The biggest differences usually show up in the supporting notes, texture, and dry-down. That is where each bottle keeps its own personality.'));
-  summary.appendChild(diff);
-
-  detail.appendChild(summary);
-
-  const [originalProfile,alternativeProfile]=await Promise.all([
-    fetchProfile(original),fetchProfile(alternative)
+  const [originalProfile,alternativeProfile,wear]=await Promise.all([
+    fetchProfile(original),fetchProfile(alternative),fetchPublicWearDetails(row.comparison_id)
   ]);
-
+  // Every comparison follows the same sequence, including search and examples.
   const chart=sideBySideChart(originalProfile||original,alternativeProfile||alternative);
   if(chart) detail.appendChild(chart);
 
-  const wear=await fetchPublicWearDetails(row.comparison_id);
   const opening=addisonWearCopy('opening',wear?.opening_comparison,row);
   const drydown=addisonWearCopy('drydown',wear?.drydown_comparison,row) || derivedDrydownFromProfiles(originalProfile||original,alternativeProfile||alternative);
-  const performance=addisonWearCopy('performance',wear?.performance_comparison,row);
-  if(opening||drydown||performance){
-      const wearCard=document.createElement('div');
-      wearCard.className='web-detail-card web-wear-card';
-      wearCard.style.marginTop='16px';
-      wearCard.appendChild(textEl('div','web-compare-kicker','HOW THE SCENTS DEVELOP'));
-      wearCard.appendChild(textEl('h3','','From opening to dry-down'));
-      if(opening){
-        const p=document.createElement('p');
-        const b=document.createElement('strong'); b.textContent='Opening: ';
-        p.appendChild(b); p.appendChild(document.createTextNode(opening)); wearCard.appendChild(p);
-      }
-      if(drydown){
-        const p=document.createElement('p');
-        const b=document.createElement('strong'); b.textContent='Dry-down: ';
-        p.appendChild(b); p.appendChild(document.createTextNode(drydown)); wearCard.appendChild(p);
-      }
-      if(performance){
-        const p=document.createElement('p');
-        const b=document.createElement('strong'); b.textContent='Performance: ';
-        p.appendChild(b); p.appendChild(document.createTextNode(performance)); wearCard.appendChild(p);
-      }
-      wearCard.appendChild(textEl('p','web-wear-note','Dry-down is the direction I expect from the fragrance as it settles; exact wear can shift with skin chemistry, climate and application.'));
-      detail.appendChild(wearCard);
-  }
-
-  const notes=document.createElement('div');
-  notes.className='web-detail-grid';
-  notes.style.marginTop='16px';
-  notes.appendChild(notesCard(originalProfile||original,'Original'));
-  notes.appendChild(notesCard(alternativeProfile||alternative,'Alternative'));
-  detail.appendChild(notes);
-
-  const addison=document.createElement('div');
-  addison.className='web-detail-card';
-  addison.style.marginTop='16px';
-  addison.appendChild(textEl('div','web-compare-kicker','ADDISON SAYS'));
-  addison.appendChild(textEl('h3','','The quick take'));
-  addison.appendChild(textEl('p','',addisonComparisonCopy('verdict',row.verdict,row)||'Use the similarity as your shortcut, then let the note profile and drydown tell you which one fits your style.'));
-  detail.appendChild(addison);
+  const summary=document.createElement('div');
+  summary.className='web-detail-card web-comparison-details';
+  summary.style.marginTop='16px';
+  const sections=[
+    ['What feels the same',addisonComparisonCopy('same',row.similarities,row)||'These two scents share a recognizable overall scent direction.'],
+    ['Where they differ',addisonComparisonCopy('different',row.differences,row)||'They keep distinct balance, texture, and wear even where the overall direction overlaps.'],
+    ['Opening',opening||'Opening detail is limited for this comparison.'],
+    ['Dry-down',drydown||'Dry-down detail is limited for this comparison.']
+  ];
+  sections.forEach(([heading,copy],index)=>{
+    const title=textEl('h3','',heading);
+    if(index) title.style.marginTop='22px';
+    summary.appendChild(title);
+    summary.appendChild(textEl('p','',copy));
+  });
+  detail.appendChild(summary);
 
   const shops=document.createElement('div');
   shops.className='web-detail-grid';
@@ -964,7 +925,7 @@ async function renderDetail(row,focusShop=''){
   requestAnimationFrame(()=>{
     if(focusShop==='alternative') altShop.scrollIntoView({behavior:'smooth',block:'center'});
     else if(focusShop==='original') originalShop.scrollIntoView({behavior:'smooth',block:'center'});
-    else pair.scrollIntoView({behavior:'smooth',block:'start'});
+    else detail.scrollIntoView({behavior:'smooth',block:'start'});
   });
 }
 
