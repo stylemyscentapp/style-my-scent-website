@@ -985,6 +985,7 @@ async function loadFullWebsiteDiscover(){
   const status=document.getElementById('website-discover-status');
   const more=document.getElementById('website-discover-more');
   const example=document.getElementById('website-discover-example');
+  const retry=document.getElementById('website-discover-retry');
   if(!input||!grid||!status||!more) return;
 
   const state={rows:[],visible:8,request:0,controller:null,nextOffset:0,hasMore:false,loadingMore:false};
@@ -1019,7 +1020,14 @@ async function loadFullWebsiteDiscover(){
     const controller=new AbortController();
     state.controller=controller;
     more.hidden=true;
+    if(retry) retry.hidden=true;
+    grid.setAttribute('aria-busy','true');
     status.textContent='Addison is pulling your closest matches…';
+    let timedOut=false;
+    const deadline=setTimeout(()=>{
+      timedOut=true;
+      controller.abort();
+    },12000);
 
     const applyRows=(rows)=>{
       if(request!==state.request) return false;
@@ -1030,27 +1038,49 @@ async function loadFullWebsiteDiscover(){
       paint();
       return true;
     };
+    const showFailure=()=>{
+      if(request!==state.request) return;
+      state.rows=[];
+      state.nextOffset=0;
+      state.hasMore=false;
+      paint();
+      status.textContent=timedOut
+        ? 'Matches are taking longer than expected. Please try again.'
+        : 'I couldn’t load matches just now. Please try again.';
+      if(retry) retry.hidden=false;
+    };
 
     try{
       const rows=await fetchComparisons(q,controller.signal);
       applyRows(rows);
     }catch(error){
-      if(error?.name==='AbortError' || request!==state.request) return;
+      if(request!==state.request) return;
+      if(controller.signal.aborted){
+        if(timedOut) showFailure();
+        return;
+      }
       console.warn('Style My Scent discover retry',error);
       try{
         await new Promise(resolve=>setTimeout(resolve,180));
-        if(controller.signal.aborted || request!==state.request) return;
+        if(controller.signal.aborted || request!==state.request){
+          if(timedOut) showFailure();
+          return;
+        }
         const rows=await fetchComparisons(q,controller.signal);
         applyRows(rows);
       }catch(retryError){
-        if(retryError?.name==='AbortError' || request!==state.request) return;
-        console.error('Style My Scent discover failed',retryError);
-        state.rows=[];
-        paint();
-        status.textContent='I couldn’t load matches just now. Please try the search again.';
+        if(request!==state.request) return;
+        if(!controller.signal.aborted || timedOut){
+          console.error('Style My Scent discover failed',retryError);
+          showFailure();
+        }
       }
+    }finally{
+      clearTimeout(deadline);
+      if(request===state.request) grid.removeAttribute('aria-busy');
     }
   };
+  if(retry) retry.addEventListener('click',refresh);
 
   let timer=null;
   input.addEventListener('input',()=>{
