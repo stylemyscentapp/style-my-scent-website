@@ -329,13 +329,17 @@
     for(let offset=0;offset<ids.length;offset+=50){
       const scope=ids.slice(offset,offset+50);
       try{
-        const qs=new URLSearchParams({select:'id,bottle_image_url',id:'in.('+scope.join(',')+')',is_active:'eq.true',verification_status:'eq.verified'});
-        const r=await fetch(SMS_URL+'/rest/v1/fragrances?'+qs.toString(),{headers:{apikey:SMS_KEY}});
+        const qs=new URLSearchParams({select:'id,bottle_image_url,hosted_image_url,display_image_url',id:'in.('+scope.join(',')+')'});
+        const r=await fetch(SMS_URL+'/rest/v1/catalog_public_fragrances_v1?'+qs.toString(),{headers:{apikey:SMS_KEY}});
         if(!r.ok) continue;
-        for(const row of await r.json()){
+        const rows=await r.json();
+        const returned=new Set(rows.map(row=>row.id));
+        scope.forEach(id=>{ if(!returned.has(id)) byId.get(id)?.remove(); });
+        for(const row of rows){
           const card=byId.get(row.id);
           const img=card?.querySelector('img');
-          if(img && /^https:\/\//i.test(String(row.bottle_image_url||''))) img.src=row.bottle_image_url;
+          const preferred=row.display_image_url||row.hosted_image_url||row.bottle_image_url||'';
+          if(img && /^https:\/\//i.test(String(preferred))) img.src=preferred;
         }
       }catch{}
     }
