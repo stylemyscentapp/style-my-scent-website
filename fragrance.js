@@ -45,10 +45,10 @@ async function api(path){
 async function fetchProduct(productId){
   if(!productId)return null;
   const q=new URLSearchParams({
-    select:'id,canonical_name,brand,concentration,product_type,bottle_image_url',
+    select:'id,canonical_name,brand,concentration,product_type,bottle_image_url,hosted_image_url,display_image_url',
     id:'eq.'+productId,is_active:'eq.true',verification_status:'eq.verified',limit:'1'
   });
-  const rows=await api('/rest/v1/fragrances?'+q.toString());
+  const rows=await api('/rest/v1/catalog_public_fragrances_v1?'+q.toString());
   return rows[0]||null;
 }
 async function fetchAffiliateSnapshot(product){
@@ -453,10 +453,10 @@ async function renderDesignerDupeSection(product,comparisons){
   if(!id){noIndex('Choose a fragrance from the Style My Scent catalog.');return}
   try{
     const q=new URLSearchParams({
-      select:'id,canonical_name,brand,concentration,product_type,top_notes,middle_notes,base_notes,fragrance_notes,accords,description,release_year,launch_year,bottle_image_url,perfumers',
+      select:'id,canonical_name,brand,concentration,product_type,top_notes,middle_notes,base_notes,fragrance_notes,accords,description,release_year,launch_year,bottle_image_url,hosted_image_url,display_image_url,perfumers',
       id:'eq.'+id,is_active:'eq.true',verification_status:'eq.verified',limit:'1'
     });
-    const products=await api('/rest/v1/fragrances?'+q.toString());
+    const products=await api('/rest/v1/catalog_public_fragrances_v1?'+q.toString());
     const p=products[0];
     if(!p){noIndex('This fragrance is not currently available in the public catalog.');return}
 
@@ -477,7 +477,7 @@ async function renderDesignerDupeSection(product,comparisons){
     addMeta('#og-url','content',canonical);
     setCanonical(canonical);
 
-    const image=safeImage(p.bottle_image_url);
+    const image=safeImage(p.display_image_url||p.hosted_image_url||p.bottle_image_url);
     if(image){
       const m=document.createElement('meta');
       m.setAttribute('property','og:image');
@@ -542,7 +542,7 @@ async function renderDesignerDupeSection(product,comparisons){
     });
 
     try{
-      const comps=await api('/rest/v1/catalog_discover_comparison_cards_fast_v1?'+cp.toString());
+      const comps=await api('/rest/v1/catalog_public_comparison_cards_v1?'+cp.toString());
       await renderDesignerDupeSection(p,comps);
 
       const wrap=el('similar-wrap');
