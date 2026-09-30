@@ -350,7 +350,7 @@ async function renderDesignerDupeSection(product,comparisons){
     const card=document.createElement('article');
     card.className='designer-dupe-card';
 
-    const img=safeImage(prod.bottle_image_url);
+    const img=safeImage(prod.display_image_url||prod.hosted_image_url||prod.bottle_image_url);
     if(img){
       const image=document.createElement('img');
       image.src=img;
@@ -484,6 +484,40 @@ async function renderDesignerDupeSection(product,comparisons){
       m.content=image;
       document.head.appendChild(m);
     }
+
+    // Give search engines a unique structured-data identity for each fragrance page.
+    // The visible page still loads live catalog data, but the rendered DOM now carries
+    // a canonical Product/WebPage graph instead of looking like one generic shell.
+    const structured=document.createElement('script');
+    structured.type='application/ld+json';
+    structured.textContent=JSON.stringify({
+      '@context':'https://schema.org',
+      '@graph':[
+        {
+          '@type':'WebPage',
+          '@id':canonical+'#webpage',
+          url:canonical,
+          name:name+' Dupes & Alternatives | Style My Scent',
+          description:document.getElementById('meta-description')?.content||desc,
+          isPartOf:{'@id':'https://stylemyscent.com/#website'},
+          mainEntity:{'@id':canonical+'#fragrance'}
+        },
+        {
+          '@type':'Product',
+          '@id':canonical+'#fragrance',
+          name:p.canonical_name,
+          brand:{'@type':'Brand',name:p.brand},
+          image:image||undefined,
+          description:desc,
+          category:'Fragrance',
+          additionalProperty:[
+            p.concentration?{'@type':'PropertyValue',name:'Concentration',value:p.concentration}:null,
+            year?{'@type':'PropertyValue',name:'Release year',value:String(year)}:null
+          ].filter(Boolean)
+        }
+      ]
+    });
+    document.head.appendChild(structured);
 
     const generic=clean(p.fragrance_notes),accords=clean(p.accords);
     el('fragrance-content').innerHTML='<div class="detail">'+
