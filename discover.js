@@ -335,7 +335,7 @@ async function noteReadyIds(rows=[],signal){
     const scope=ids.slice(offset,offset+55);
     const idFilter='in.('+scope.join(',')+')';
     const [coreRes,addisonRes,discoverRes]=await Promise.all([
-      fetch(SMS_SUPABASE_URL+'/rest/v1/fragrances?'+new URLSearchParams({
+      fetch(SMS_SUPABASE_URL+'/rest/v1/catalog_public_fragrances_v1?'+new URLSearchParams({
         select:'id,top_notes,middle_notes,base_notes,fragrance_notes,accords',
         id:idFilter,is_active:'eq.true',verification_status:'eq.verified'
       }).toString(),{headers:{apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY},signal}),
@@ -422,7 +422,7 @@ async function fetchComparisons(query='',signal,{offset:sourceOffset=0,pageLimit
     const params=new URLSearchParams(baseParams);
     params.set('limit',String(pageSize));
     params.set('offset',String(offset));
-    const response=await fetch(SMS_SUPABASE_URL+'/rest/v1/catalog_discover_comparison_cards_fast_v3?'+params.toString(),{
+    const response=await fetch(SMS_SUPABASE_URL+'/rest/v1/catalog_public_comparison_cards_v1?'+params.toString(),{
       headers:{apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY},signal
     });
     if(!response.ok) throw new Error('Discover unavailable');
@@ -531,7 +531,7 @@ async function hydrateCompactNotes(rows=[]){
         select:'id,top_notes,middle_notes,base_notes,fragrance_notes,accords',
         id:'in.('+scope.join(',')+')'
       });
-      const response=await fetch(SMS_SUPABASE_URL+'/rest/v1/fragrances?'+params.toString(),{headers});
+      const response=await fetch(SMS_SUPABASE_URL+'/rest/v1/catalog_public_fragrances_v1?'+params.toString(),{headers});
       if(!response.ok) continue;
       for(const row of await response.json()) SMS_COMPACT_PROFILE_CACHE.set(row.id,compactProfileNotes(row));
     }catch{}
@@ -548,7 +548,7 @@ async function fetchProfile(product){
   if(!product?.id) return null;
   const headers={apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY};
   const coreParams=new URLSearchParams({
-    select:'id,canonical_name,brand,concentration,product_type,top_notes,middle_notes,base_notes,fragrance_notes,accords,bottle_image_url',
+    select:'id,canonical_name,brand,concentration,product_type,top_notes,middle_notes,base_notes,fragrance_notes,accords,bottle_image_url,hosted_image_url,display_image_url',
     id:'eq.'+product.id,is_active:'eq.true',verification_status:'eq.verified',limit:'1'
   });
   const addisonParams=new URLSearchParams({
@@ -560,7 +560,7 @@ async function fetchProfile(product){
     fragrance_id:'eq.'+product.id,limit:'1'
   });
   const [coreRes,addisonRes,discoverRes]=await Promise.all([
-    fetch(SMS_SUPABASE_URL+'/rest/v1/fragrances?'+coreParams.toString(),{headers}),
+    fetch(SMS_SUPABASE_URL+'/rest/v1/catalog_public_fragrances_v1?'+coreParams.toString(),{headers}),
     fetch(SMS_SUPABASE_URL+'/rest/v1/catalog_addison_scent_profile?'+addisonParams.toString(),{headers}),
     fetch(SMS_SUPABASE_URL+'/rest/v1/catalog_discover_scent_profiles?'+discoverParams.toString(),{headers})
   ]);
@@ -581,7 +581,7 @@ async function fetchProfile(product){
     brand:row.brand||product.brand,
     name:row.canonical_name||product.name,
     concentration:row.concentration||row.product_type||product.concentration,
-    imageUrl:row.bottle_image_url||product.imageUrl,
+    imageUrl:row.display_image_url||row.hosted_image_url||row.bottle_image_url||product.imageUrl,
     notes:{
       top:pick(dnotes.top,row.top_notes,addison?.top_notes),
       heart:pick(dnotes.heart,row.middle_notes,addison?.middle_notes),
