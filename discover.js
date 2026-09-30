@@ -1153,6 +1153,18 @@ async function openDealDetail(row){
 }
 
 const SMS_DEALS_STATE={visible:8,request:0};
+function websiteOfferListingDetails(affiliateUrl){
+  try{
+    const affiliate=new URL(affiliateUrl);
+    const destination=new URL(affiliate.searchParams.get('url') || affiliate.href);
+    const variant=destination.searchParams.get('attribute_pa_size') || '';
+    const match=variant.match(/(?:^|[-\s])(\d+(?:[.-]\d+)?)\s*[- ]?(oz|ml)(?:$|[-\s])/i);
+    const size=match ? match[1].replace('-', '.')+' '+match[2].toLowerCase() : '';
+    const tester=/(?:^|[-\s/])tester(?:$|[-\s/])/i.test(variant+' '+destination.pathname);
+    return {size,tester};
+  }catch{return {size:'',tester:false}}
+}
+
 async function loadStyleMyScentDiscovery({more=false}={}){
   const host=document.getElementById('live-deal-grid');
   const status=document.getElementById('live-deal-status');
@@ -1234,7 +1246,57 @@ async function loadStyleMyScentDiscovery({more=false}={}){
       copy.appendChild(textEl('h3','',row.canonical_name || 'Fragrance'));
 
       const price=Number(row.price);
-      const detail=(row.concentration || 'Fragrance')+(Number.isFinite(price)?' • from $'+price.toFixed(2):'');
+      const listing=websiteOfferListingDetails(row.affiliate_url);
+      const detail=(row.concentration || 'Fragrance')+(Number.isFinite(price)?' • from 
+      copy.appendChild(textEl('p','',detail));
+      copy.appendChild(textEl('span','',row.retailer_name || 'Retailer offer'));
+      const disclosure=textEl('span','','Paid links • commissions may be earned');disclosure.style.display='block';copy.appendChild(disclosure);
+      const view=buttonEl('VIEW NOTES, MATCHES & RETAILERS');
+      view.setAttribute('aria-label','View notes, matches and retailers for '+row.brand+' '+row.canonical_name);
+      view.addEventListener('click',()=>openDealDetail(row));copy.appendChild(view);
+
+      const affiliateUrl=safeHttpsUrl(row.affiliate_url);
+      if(affiliateUrl){
+        const actions=document.createElement('div');
+        actions.className='discover-actions';
+        const shop=document.createElement('a');
+        shop.className='mini-btn';
+        shop.href=affiliateUrl;
+        shop.target='_blank';
+        shop.rel='sponsored noopener noreferrer';
+        shop.textContent='VIEW AT '+String(row.retailer_name || 'RETAILER').toUpperCase();
+        actions.appendChild(shop);
+
+        const amazon=document.createElement('a');
+        const amazonQuery=[row.brand,row.canonical_name,row.concentration].filter(Boolean).join(' ');
+        amazon.className='mini-btn';
+        amazon.href='https://www.amazon.com/s?k='+encodeURIComponent(amazonQuery)+'&tag='+encodeURIComponent(SMS_AMAZON_TAG);
+        amazon.target='_blank';
+        amazon.rel='sponsored nofollow noopener noreferrer';
+        amazon.textContent='SEARCH AMAZON';
+        actions.appendChild(amazon);
+
+        copy.appendChild(actions);
+      }
+
+      card.appendChild(copy);
+      host.appendChild(card);
+    });
+    let moreButton=document.getElementById('website-deals-more');
+    if(!moreButton){moreButton=buttonEl('SHOW MORE DEALS');moreButton.id='website-deals-more';host.after(moreButton);moreButton.addEventListener('click',async()=>{moreButton.disabled=true;await loadStyleMyScentDiscovery({more:true});moreButton.disabled=false;});}
+    moreButton.hidden=rows.length<=SMS_DEALS_STATE.visible && allRows.length<limit;
+    if(status) status.textContent=rows.length?'Showing '+Math.min(rows.length,SMS_DEALS_STATE.visible)+' loaded offers. Open a bottle to view notes, comparisons and retailer options.':'No matching live offers found. Try another bottle or brand.';
+  }catch{
+    host.replaceChildren();
+    if(status) status.textContent='Live offers are refreshing. You can still shop our verified partner links above.';
+  }
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  loadFullWebsiteDiscover().catch(()=>{});
+  loadStyleMyScentDiscovery().catch(()=>{});
+});
++price.toFixed(2):'')+(listing.size?' • '+listing.size:' • Size: check retailer')+(listing.tester?' • Tester':'');
       copy.appendChild(textEl('p','',detail));
       copy.appendChild(textEl('span','',row.retailer_name || 'Retailer offer'));
       const disclosure=textEl('span','','Paid links • commissions may be earned');disclosure.style.display='block';copy.appendChild(disclosure);
