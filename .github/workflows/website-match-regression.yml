@@ -63,7 +63,7 @@ jobs:
             for(let offset=0;offset<900;offset+=100){
               const p=new URLSearchParams(base);
               p.set('limit','100'); p.set('offset',String(offset));
-              const page=await get('catalog_discover_comparison_cards_fast_v1',p);
+              const page=await get('catalog_public_comparison_cards_v1',p);
               out.push(...page);
               if(page.length<100) break;
             }
