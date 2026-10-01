@@ -102,26 +102,12 @@ jobs:
             const ready=new Set();
             for(let i=0;i<ids.length;i+=50){
               const scope=ids.slice(i,i+50), idFilter='in.('+scope.join(',')+')';
-              const core=await get('fragrances',new URLSearchParams({
+              const core=await get('catalog_public_fragrances_v1',new URLSearchParams({
                 select:'id,top_notes,middle_notes,base_notes,fragrance_notes,accords',
-                id:idFilter,is_active:'eq.true',verification_status:'eq.verified'
+                id:idFilter
               }));
               for(const x of core){
                 if(['top_notes','middle_notes','base_notes','fragrance_notes','accords'].reduce((n,k)=>n+countArray(x[k]),0)>0) ready.add(x.id);
-              }
-              const addison=await get('catalog_addison_scent_profile',new URLSearchParams({
-                select:'fragrance_id,top_notes,middle_notes,base_notes,general_notes,accords',fragrance_id:idFilter
-              }));
-              for(const x of addison){
-                if(['top_notes','middle_notes','base_notes','general_notes','accords'].reduce((n,k)=>n+countArray(x[k]),0)>0) ready.add(x.fragrance_id);
-              }
-              const discover=await get('catalog_discover_scent_profiles',new URLSearchParams({
-                select:'fragrance_id,notes,accords',fragrance_id:idFilter
-              }));
-              for(const x of discover){
-                const notes=x.notes||{};
-                const n=['top','heart','base','general'].reduce((sum,k)=>sum+countArray(notes[k]),0)+countArray(x.accords);
-                if(n>0) ready.add(x.fragrance_id);
               }
             }
             return ready;
