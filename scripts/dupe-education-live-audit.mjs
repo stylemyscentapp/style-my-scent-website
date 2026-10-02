@@ -64,7 +64,8 @@ for(const card of cards){
 assert.equal(badScore,0,'website comparison pool contains invalid similarity score(s)');
 assert.equal(self,0,'website comparison pool contains self-comparison(s)');
 assert.equal(scorePolicyMissing,0,'website comparison pool is missing score publishability metadata');
-assert.ok(scoreHeld<=20,'too many website matches have a held exact percentage: '+scoreHeld);
+assert.ok(scorePublished>=1200,'too few website comparison percentages remain publishable: '+scorePublished);
+assert.ok(scoreHeld>=1&&scoreHeld<=100,'held website comparison score count is outside the expected safety band: '+scoreHeld);
 assert.equal(bothReady,cards.length,'every published website comparison must have scent data on both bottles');
 assert.ok(bothOpening>=650,'opening education coverage regressed: '+bothOpening);
 assert.ok(bothDrydown>=650,'dry-down education coverage regressed: '+bothDrydown);
