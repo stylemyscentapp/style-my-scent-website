@@ -334,11 +334,11 @@ function comparisonEducation(comparison,alternative,designer,wear=null){
     action='Test the dry-down first. '+baseFact.text.replace(/^Dry-down:\s*/,'')+' If that finish is the part you love in '+designer.canonical_name+', it is the make-or-break point for this alternative.';
   }else if(topFact){
     action='Compare the first 20–30 minutes on skin. '+topFact.text.replace(/^Opening:\s*/,'')+
-      (comparison?.score_publishable===false
+      (comparison?.score_publishable!==true
         ? ' Then wait for the base before deciding whether this feels close enough for you.'
         : ' Then wait for the base before deciding whether the similarity percentage matches your nose.');
   }else{
-    action=comparison?.score_publishable===false
+    action=comparison?.score_publishable!==true
       ? 'Use the scent structure above as the guide. I’m holding the exact percentage until the number has stronger support, so wear '+designer.canonical_name+' and '+alternative.canonical_name+' side by side before treating them as interchangeable.'
       : 'Use the similarity score as a reference point only. Wear '+designer.canonical_name+' and '+alternative.canonical_name+' side by side before treating them as interchangeable.';
   }
@@ -472,12 +472,12 @@ async function renderDesignerDupeSection(product,comparisons){
     brand.textContent=[prod.brand,prod.concentration||prod.product_type].filter(Boolean).join(' · ');
     card.appendChild(brand);
 
-    if(comparison?.score_publishable!==false&&Number.isFinite(similarity)){
+    if(comparison?.score_publishable===true&&Number.isFinite(similarity)){
       const score=document.createElement('div');
       score.className='designer-dupe-score';
       score.textContent='≈ '+Math.round(similarity)+'% similar';
       card.appendChild(score);
-    }else if(comparison?.score_publishable===false){
+    }else if(comparison?.score_publishable!==true){
       const score=document.createElement('div');
       score.className='designer-dupe-score';
       score.textContent='SCENT MATCH · SEE BREAKDOWN';
