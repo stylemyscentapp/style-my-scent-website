@@ -229,7 +229,7 @@ function addisonComparisonCopy(kind,value,row={}){
   if(boilerplate.test(copy)||suspect.test(copy)) copy='';
   const alt=String(row.alternative_name||'the alternative').trim();
   const original=String(row.original_name||'the designer').trim();
-  const shared=Array.isArray(row.shared_notes)?row.shared_notes.filter(Boolean):[];
+  const shared=cleanCustomerNotes(Array.isArray(row.shared_notes)?row.shared_notes:[]);
   const similarity=Number(row.estimated_similarity);
   const technical=/(owner[- ]?(approved|verified|research)|human research|workbook|csv|database|machine|evidence|source[- ]reported|source provides|catalog currently|still gathering|resolution file|supplied snapshot|pipeline|publication)/i;
 
