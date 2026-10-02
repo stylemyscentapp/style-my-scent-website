@@ -224,6 +224,9 @@ function humanList(items=[]){
 
 function addisonComparisonCopy(kind,value,row={}){
   let copy=String(value||'').replace(/\s+/g,' ').trim();
+  const boilerplate=/(keeping the overall scent direction closely related|extremely close on paper|same recognizable scent direction|distinct balance, texture, and wear|overall scent identity stays very familiar)/i;
+  const suspect=/(https?|item https|invigorate the senses|pepper invigorate|\bof vanilla\b|\bparfum\b\s*$)/i;
+  if(boilerplate.test(copy)||suspect.test(copy)) copy='';
   const alt=String(row.alternative_name||'the alternative').trim();
   const original=String(row.original_name||'the designer').trim();
   const shared=Array.isArray(row.shared_notes)?row.shared_notes.filter(Boolean):[];
@@ -235,11 +238,11 @@ function addisonComparisonCopy(kind,value,row={}){
     if(shared.length){
       return `They both list ${humanList(shared.slice(0,5))}. Those shared notes give you a useful starting point for comparing the bottles alongside their differences below.`;
     }
-    if(technical.test(copy)){
-      if(Number.isFinite(similarity)&&similarity>=90){
-        return `${alt} is listed as an alternative to ${original}, with a catalog similarity estimate of about ${Math.round(similarity)}%. Compare the notes and differences below before choosing.`;
+    if(technical.test(copy)||!copy){
+      if(shared.length){
+        return `They both list ${humanList(shared.slice(0,5))}. That shared material is a useful starting point, but I still want you to compare the development below.`;
       }
-      return `${alt} is listed as an alternative to ${original}. Compare their published notes and differences below; opening and dry-down resemblance need bottle-specific support.`;
+      return `The match is verified, but the published note-level overlap is limited here. Open the full breakdown before treating ${alt} as a close substitute for ${original}.`;
     }
     copy=copy
       .replace(/^Both profiles share (.+?), keeping the overall scent direction closely related\.?$/i,
@@ -265,10 +268,7 @@ function addisonComparisonCopy(kind,value,row={}){
 
   if(kind==='verdict'){
     if(technical.test(copy) || !copy){
-      if(Number.isFinite(similarity)&&similarity>=90){
-        return `If you love ${original}, ${alt} is one I would confidently put in front of you. The signature stays very close, while the finish still gives you a reason to choose one bottle over the other.`;
-      }
-      return `If you love ${original}, ${alt} is a strong alternative to try side by side. The core scent idea stays familiar, while the drydown gives it its own character.`;
+      return `Use the similarity score as a reference point, then judge ${original} and ${alt} by the opening, heart, and dry-down below. The percentage is not the reason for the match.`;
     }
     if(/^A strong alternative with a clearly related profile/i.test(copy)){
       return `If you like ${original}, I would put ${alt} in the strong-alternative lane: clearly familiar, but with enough personality to stand on its own.`;
@@ -508,7 +508,7 @@ async function fetchComparisons(query='',signal,{offset:sourceOffset=0,pageLimit
 const SMS_COMPACT_PROFILE_CACHE=new Map();
 
 function cleanCustomerNotes(values=[]){
-  const junk=/\b(adding|refinement|refreshing start|invigorating opening|invigorating aroma|ideal|suitable|everyday wear|special events?|special occasions|professional settings|confidence|elegance|sophistication|lasting|memorable|signature|character|balanced|modernity|energy|identity|family|complexity|grounding|quietly powerful|unexpected|finally|top notes?|heart notes?|middle notes?|base notes?)\b/i;
+  const junk=/\b(adding|refinement|refreshing start|invigorating opening|invigorating aroma|ideal|suitable|everyday wear|special events?|special occasions|professional settings|confidence|elegance|sophistication|lasting|memorable|signature|character|balanced|modernity|energy|identity|family|complexity|grounding|quietly powerful|unexpected|finally|intriguing|refreshing|juicy energy|spicy warmth|tactile sensuality|profound grounding|citrus sparkle|invigorate|senses|https?|www|\.com|top notes?|heart notes?|middle notes?|base notes?)\b/i;
   const broken=/^(?:nce|min|fume|lla|pea|affron|range blossom|app|anilla)$/i;
   const seen=new Set();
   return (Array.isArray(values)?values:[]).flatMap(raw=>{
@@ -716,6 +716,81 @@ function sideBySideChart(original,alternative){
   card.appendChild(grid);
   card.appendChild(textEl('p','web-wear-note','A quick structural view of where the two scents line up and where they separate.'));
   return card;
+}
+
+
+const WEB_COMPARISON_FAMILIES={
+  citrus:['bergamot','lemon','lime','mandarin','orange','grapefruit','citron','neroli'],
+  floral:['rose','jasmine','violet','gardenia','tuberose','orange blossom','hedione','peony','orchid'],
+  woody:['cedar','cedarwood','sandalwood','vetiver','patchouli','guaiac','oak','cashmere wood','cashmeran'],
+  musk:['musk','musky','ambrette'],
+  amberwood:['ambroxan','ambrox','ambergris','amberwood','amber woods'],
+  spice:['ginger','cardamom','pepper','pink pepper','cinnamon','nutmeg','clove','saffron'],
+  gourmand:['vanilla','tonka','caramel','praline','sugar','honey','marshmallow','chocolate','cocoa'],
+  oud:['oud','agarwood'],
+  aromatic:['lavender','lavandin','sage','rosemary','basil'],
+};
+function webNoteFamily(value=''){
+  const key=normalized(value);
+  for(const [family,terms] of Object.entries(WEB_COMPARISON_FAMILIES)){
+    if(terms.some(term=>key===term||key.includes(term)||term.includes(key)))return family;
+  }
+  return '';
+}
+function webSameNote(a='',b=''){
+  const x=normalized(a),y=normalized(b);
+  return Boolean(x&&y&&(x===y||(Math.min(x.length,y.length)>=4&&(x.includes(y)||y.includes(x)))));
+}
+function profileStageFact(original,alternative,key,label){
+  const left=Array.isArray(original?.notes?.[key])?original.notes[key].filter(Boolean):[];
+  const right=Array.isArray(alternative?.notes?.[key])?alternative.notes[key].filter(Boolean):[];
+  if(!left.length&&!right.length)return null;
+  const shared=[];
+  for(const l of left){
+    const r=right.find(value=>webSameNote(l,value));
+    if(r)shared.push({left:l,right:r});
+    if(shared.length>=2)break;
+  }
+  if(shared.length){
+    const pair=shared.map(x=>x.left===x.right?x.left:(x.left+' / '+x.right)).join(' and ');
+    return {label,connected:true,text:label+': both keep '+pair+' in play, giving this stage a concrete structural bridge.'};
+  }
+  for(const l of left){
+    const family=webNoteFamily(l);
+    if(!family)continue;
+    const r=right.find(value=>webNoteFamily(value)===family);
+    if(r)return {label,connected:true,text:label+': '+original.name+' uses '+l+', while '+alternative.name+' uses '+r+'. They stay in the same '+family+' family without being identical.'};
+  }
+  if(left.length&&right.length){
+    return {label,connected:false,text:label+': '+original.name+' leans on '+left.slice(0,2).join(' and ')+', while '+alternative.name+' uses '+right.slice(0,2).join(' and ')+'. This is where the profiles separate.'};
+  }
+  return null;
+}
+function profileComparisonEducation(original,alternative,row,wear=null){
+  const facts=[
+    profileStageFact(original,alternative,'top','Opening'),
+    profileStageFact(original,alternative,'heart','Heart'),
+    profileStageFact(original,alternative,'base','Dry-down'),
+  ].filter(Boolean);
+  const connections=facts.filter(x=>x.connected);
+  const shared=Array.isArray(row.shared_notes)?cleanCustomerNotes(row.shared_notes):[];
+  const snapshot=connections.length
+    ? connections[0].text.replace(/^[^:]+:\s*/,'')+' That is the structural reason I would keep this match in the conversation.'
+    : shared.length
+      ? 'The verified comparison lists '+humanList(shared.slice(0,4))+' as shared material. That is useful common ground, but it does not make the entire wear identical.'
+      : 'This match is verified, but the published scent profiles do not give me enough note-level overlap to explain it as a close note-for-note substitute.';
+
+  const breakdown=facts.map(x=>x.text);
+  const base=facts.find(x=>x.label==='Dry-down');
+  const opening=facts.find(x=>x.label==='Opening');
+  let action=base
+    ? 'Make the dry-down your deciding test. '+base.text.replace(/^Dry-down:\s*/,'')+' That finish is where I would decide whether the alternative really scratches the same itch.'
+    : opening
+      ? 'Compare the first 20–30 minutes, then wait for the base. '+opening.text.replace(/^Opening:\s*/,'')+' Do not buy on the opening or percentage alone.'
+      : 'Use the percentage as a reference only and wear the two bottles side by side before treating them as interchangeable.';
+  const performance=addisonWearCopy('performance',wear?.performance_comparison,row);
+  if(performance)action+=' '+performance;
+  return {snapshot,breakdown,action};
 }
 
 function derivedOpeningFromProfiles(original,alternative){
@@ -937,23 +1012,27 @@ async function renderDetail(row,focusShop=''){
   const chart=sideBySideChart(originalProfile||original,alternativeProfile||alternative);
   if(chart) detail.appendChild(chart);
 
-  const opening=addisonWearCopy('opening',wear?.opening_comparison,row) || derivedOpeningFromProfiles(originalProfile||original,alternativeProfile||alternative);
-  const drydown=addisonWearCopy('drydown',wear?.drydown_comparison,row) || derivedDrydownFromProfiles(originalProfile||original,alternativeProfile||alternative);
+  const education=profileComparisonEducation(originalProfile||original,alternativeProfile||alternative,row,wear);
   const summary=document.createElement('div');
   summary.className='web-detail-card web-comparison-details';
   summary.style.marginTop='16px';
-  const sections=[
-    ['What feels the same',addisonComparisonCopy('same',row.similarities,row)||'Similarity detail is limited for this comparison, so I’m not going to overstate the match.'],
-    ['Where they differ',addisonComparisonCopy('different',row.differences,row)||'Difference detail is limited for this comparison, so I’m keeping the call conservative.'],
-    ['Opening',opening||'Opening detail is limited for this comparison.'],
-    ['Dry-down',drydown||'Dry-down detail is limited for this comparison.']
-  ];
-  sections.forEach(([heading,copy],index)=>{
-    const title=textEl('h3','',heading);
-    if(index) title.style.marginTop='22px';
-    summary.appendChild(title);
-    summary.appendChild(textEl('p','',copy));
-  });
+
+  summary.appendChild(textEl('h3','','SNAPSHOT'));
+  summary.appendChild(textEl('p','',education.snapshot));
+
+  const breakdownTitle=textEl('h3','','BREAKDOWN');
+  breakdownTitle.style.marginTop='22px';
+  summary.appendChild(breakdownTitle);
+  if(education.breakdown.length){
+    education.breakdown.forEach(line=>summary.appendChild(textEl('p','',line)));
+  }else{
+    summary.appendChild(textEl('p','','Opening, heart, and dry-down detail is limited for this comparison, so I’m not filling the gap with generic copy.'));
+  }
+
+  const actionTitle=textEl('h3','','ACTION');
+  actionTitle.style.marginTop='22px';
+  summary.appendChild(actionTitle);
+  summary.appendChild(textEl('p','',education.action));
   detail.appendChild(summary);
 
   const shops=document.createElement('div');
