@@ -381,7 +381,7 @@ async function fetchComparisons(query='',signal,{offset:sourceOffset=0,pageLimit
     'comparison_id','fragrance_id','compared_fragrance_id','relationship',
     'estimated_similarity','shared_notes','similarities','differences','verdict',
     'source_label','source_url','source_tier','verified_at','updated_at',
-    'owner_verified','text_target_only',
+    'owner_verified','text_target_only','score_publishable',
     'alternative_brand','alternative_name','alternative_concentration','alternative_image_url',
     'original_brand','original_name','original_concentration','original_image_url'
   ].join(',');
@@ -928,7 +928,8 @@ function renderCompareCard(row,openDetail){
   card.appendChild(pair);
 
   const similarity=Number(row.estimated_similarity);
-  if(Number.isFinite(similarity)) card.appendChild(textEl('div','web-compare-score','≈ '+Math.round(similarity)+'% SIMILAR'));
+  if(row.score_publishable!==false&&Number.isFinite(similarity)) card.appendChild(textEl('div','web-compare-score','≈ '+Math.round(similarity)+'% SIMILAR'));
+  else if(row.score_publishable===false) card.appendChild(textEl('div','web-compare-score','SCENT MATCH • SEE BREAKDOWN'));
 
   const similarities=addisonComparisonCopy('same',row.similarities,row);
   const differences=addisonComparisonCopy('different',row.differences,row);
@@ -1001,8 +1002,10 @@ async function renderDetail(row,focusShop=''){
   pair.appendChild(bottleSide(alternative,'ALTERNATIVE'));
   detail.appendChild(pair);
 
-  if(Number.isFinite(similarity)){
+  if(row.score_publishable!==false&&Number.isFinite(similarity)){
     detail.appendChild(textEl('div','web-compare-score','≈ '+Math.round(similarity)+'% SIMILAR'));
+  }else if(row.score_publishable===false){
+    detail.appendChild(textEl('div','web-compare-score','SCENT MATCH • PERCENTAGE HELD'));
   }
 
   const [originalProfile,alternativeProfile,wear]=await Promise.all([
@@ -1075,8 +1078,10 @@ function renderCompareCardFallback(row,openDetail){
   card.appendChild(textEl('h3','web-detail-title',
     [original.brand,original.name,'↔',alternative.brand,alternative.name].filter(Boolean).join(' ')
   ));
-  if(Number.isFinite(similarity)){
+  if(row.score_publishable!==false&&Number.isFinite(similarity)){
     card.appendChild(textEl('div','web-compare-score','≈ '+Math.round(similarity)+'% SIMILAR'));
+  }else if(row.score_publishable===false){
+    card.appendChild(textEl('div','web-compare-score','SCENT MATCH • SEE BREAKDOWN'));
   }
   const actions=document.createElement('div');
   actions.className='web-compare-actions';
@@ -1252,7 +1257,8 @@ async function openDealDetail(row){
     if(!matches.length) detail.appendChild(textEl('p','','No published comparison is available for this exact bottle yet.'));
     for(const match of matches){
       const other=productFromComparison(match,match.fragrance_id===product.id?'original':'alternative');
-      const button=buttonEl([other.brand,other.name].filter(Boolean).join(' ')+' — ≈ '+Math.round(Number(match.estimated_similarity))+'% • VIEW COMPARISON');
+      const scoreLabel=match.score_publishable!==false?' — ≈ '+Math.round(Number(match.estimated_similarity))+'%':' — SCENT MATCH';
+      const button=buttonEl([other.brand,other.name].filter(Boolean).join(' ')+scoreLabel+' • VIEW COMPARISON');
       button.style.marginBottom='12px';
       button.addEventListener('click',()=>renderDetail(match));
       detail.appendChild(button);
