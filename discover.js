@@ -948,21 +948,21 @@ function renderCompareCard(row,openDetail){
   if(similarities){
     const p=document.createElement('p');
     p.className='web-compare-copy';
-    const b=document.createElement('strong'); b.textContent='Why I paired them: ';
+    const b=document.createElement('strong'); b.textContent='Snapshot: ';
     p.appendChild(b); p.appendChild(document.createTextNode(similarities));
     card.appendChild(p);
   }
   if(differences){
     const p=document.createElement('p');
     p.className='web-compare-copy';
-    const b=document.createElement('strong'); b.textContent='Where they differ: ';
+    const b=document.createElement('strong'); b.textContent='Quick difference: ';
     p.appendChild(b); p.appendChild(document.createTextNode(differences));
     card.appendChild(p);
   }
 
   const actions=document.createElement('div');
   actions.className='web-compare-actions';
-  const why=buttonEl('SEE WHY I MATCHED THEM');
+  const why=buttonEl('OPEN FULL BREAKDOWN');
   why.addEventListener('click',()=>openDetail(row));
   actions.appendChild(why);
 
