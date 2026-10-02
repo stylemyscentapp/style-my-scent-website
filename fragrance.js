@@ -333,9 +333,14 @@ function comparisonEducation(comparison,alternative,designer,wear=null){
   if(baseFact){
     action='Test the dry-down first. '+baseFact.text.replace(/^Dry-down:\s*/,'')+' If that finish is the part you love in '+designer.canonical_name+', it is the make-or-break point for this alternative.';
   }else if(topFact){
-    action='Compare the first 20–30 minutes on skin. '+topFact.text.replace(/^Opening:\s*/,'')+' Then wait for the base before deciding whether the similarity percentage matches your nose.';
+    action='Compare the first 20–30 minutes on skin. '+topFact.text.replace(/^Opening:\s*/,'')+
+      (comparison?.score_publishable===false
+        ? ' Then wait for the base before deciding whether this feels close enough for you.'
+        : ' Then wait for the base before deciding whether the similarity percentage matches your nose.');
   }else{
-    action='Use the similarity score as a reference point only. Wear '+designer.canonical_name+' and '+alternative.canonical_name+' side by side before treating them as interchangeable.';
+    action=comparison?.score_publishable===false
+      ? 'Use the scent structure above as the guide. I’m holding the exact percentage until the number has stronger support, so wear '+designer.canonical_name+' and '+alternative.canonical_name+' side by side before treating them as interchangeable.'
+      : 'Use the similarity score as a reference point only. Wear '+designer.canonical_name+' and '+alternative.canonical_name+' side by side before treating them as interchangeable.';
   }
   const performance=wear?stylistWearCopy('performance',wear.performance_comparison,alternative,designer):'';
   if(performance)action+=' '+performance;
@@ -467,10 +472,15 @@ async function renderDesignerDupeSection(product,comparisons){
     brand.textContent=[prod.brand,prod.concentration||prod.product_type].filter(Boolean).join(' · ');
     card.appendChild(brand);
 
-    if(Number.isFinite(similarity)){
+    if(comparison?.score_publishable!==false&&Number.isFinite(similarity)){
       const score=document.createElement('div');
       score.className='designer-dupe-score';
       score.textContent='≈ '+Math.round(similarity)+'% similar';
+      card.appendChild(score);
+    }else if(comparison?.score_publishable===false){
+      const score=document.createElement('div');
+      score.className='designer-dupe-score';
+      score.textContent='SCENT MATCH · SEE BREAKDOWN';
       card.appendChild(score);
     }
 
@@ -673,7 +683,7 @@ async function renderDesignerDupeSection(product,comparisons){
     document.head.appendChild(s);
 
     const cp=new URLSearchParams({
-      select:'comparison_id,fragrance_id,compared_fragrance_id,relationship,estimated_similarity,shared_notes,alternative_brand,alternative_name,original_brand,original_name,similarities,differences,verdict,owner_verified',
+      select:'comparison_id,fragrance_id,compared_fragrance_id,relationship,estimated_similarity,score_publishable,shared_notes,alternative_brand,alternative_name,original_brand,original_name,similarities,differences,verdict,owner_verified',
       or:'(fragrance_id.eq.'+id+',compared_fragrance_id.eq.'+id+')',
       order:'estimated_similarity.desc',
       limit:'30'
