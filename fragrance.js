@@ -343,35 +343,11 @@ function comparisonEducation(comparison,alternative,designer,wear=null){
 }
 
 function stylistDupeReason(comparison,alternative,designer){
-  const sim=Number(comparison?.estimated_similarity);
-  const clean=(value='')=>String(value||'').replace(/\s+/g,' ').trim();
-  const forbidden=/(owner[- ]?(approved|verified|research)|human research|workbook|csv|database|machine|evidence|source[- ]reported|source provides|catalog currently|still gathering|resolution file)/i;
-  const same=clean(comparison?.similarities);
-  const diff=clean(comparison?.differences);
-  const shared=Array.isArray(comparison?.shared_notes)?comparison.shared_notes.filter(Boolean):[];
-
-  if(same && !forbidden.test(same)){
-    let line=same
-      .replace(/^Both profiles share (.+?), keeping the overall scent direction closely related\.?$/i,
-        (_,notes)=>`The strongest overlap is ${notes}, which keeps the scent signature immediately familiar.`)
-      .replace(/^Both profiles share (.+?)\.?$/i,
-        (_,notes)=>`The strongest overlap is ${notes}, and that is where the resemblance comes through first.`);
-    if(diff && !forbidden.test(diff)){
-      line+=' '+diff
-        .replace(/^The Middle Eastern fragrance emphasizes (.+?), while the designer reference emphasizes (.+?)\.?$/i,
-          (_,a,o)=>`The alternative leans more into ${a}, while the designer keeps more of ${o}.`)
-        .replace(/^The source fragrance emphasizes (.+?), while the designer reference emphasizes (.+?)\.?$/i,
-          (_,a,o)=>`The alternative leans more into ${a}, while the designer keeps more of ${o}.`);
-    }
-    return line;
-  }
-
+  const shared=cleanCustomerNotes(Array.isArray(comparison?.shared_notes)?comparison.shared_notes:[]);
   if(shared.length){
-    const notes=shared.slice(0,5).join(', ');
-    return `The match is anchored by ${notes}. That shared structure keeps ${alternative?.canonical_name||'the alternative'} close to ${designer?.canonical_name||'the designer'} while still leaving room for its own finish.`;
+    return 'The published comparison shares '+shared.slice(0,4).join(', ')+'. That is useful common ground, but I would still use the full opening/heart/dry-down breakdown before calling the bottles interchangeable.';
   }
-
-  return 'Comparison detail is limited here. The similarity score stays visible, but I’m not using the percentage as a substitute for scent evidence.';
+  return 'The comparison is verified, but note-level detail is limited here. Open the full breakdown rather than treating the similarity percentage as the explanation.';
 }
 
 async function renderDesignerDupeSection(product,comparisons){
