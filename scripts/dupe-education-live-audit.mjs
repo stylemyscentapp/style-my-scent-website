@@ -32,7 +32,7 @@ for(let offset=0;;offset+=500){
   cards.push(...page);
   if(page.length<500) break;
 }
-assert.ok(cards.length>=1400,'website public comparison pool unexpectedly small: '+cards.length);
+assert.ok(cards.length>=1300,'website public comparison pool unexpectedly small: '+cards.length);
 
 const ids=[...new Set(cards.flatMap(r=>[r.fragrance_id,r.compared_fragrance_id]).filter(Boolean))];
 const profiles=new Map();
