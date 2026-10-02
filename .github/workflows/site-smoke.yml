@@ -39,6 +39,14 @@ jobs:
           grep -q "ACTION" fragrance.js
           grep -q "comparisonEducation" fragrance.js
           grep -q "profileComparisonEducation" discover.js
+          grep -q "score_publishable===true" discover.js
+          grep -q "score_publishable===true" fragrance.js
+          grep -q "SCENT MATCH" discover.js
+          grep -q "SCENT MATCH" fragrance.js
+          grep -q "Snapshot of the real overlap" index.html
+          grep -q "Breakdown of the opening, heart and dry-down" index.html
+          grep -q "Action call" index.html
+          grep -q "The scent structure—not the percentage—is the reason for the match" index.html
           grep -q "Use the similarity score as a reference" fragrance.js
           ! grep -q "At about .*% similarity" fragrance.js
           ! grep -q "same recognizable scent direction" fragrance.js
