@@ -10,6 +10,28 @@ const el=(id)=>document.getElementById(id);
 const clean=(v)=>Array.isArray(v)?v.filter(Boolean):[];
 const text=(v)=>String(v??'');
 
+function cleanCustomerNotes(values=[]){
+  const junk=/\b(adding|refinement|refreshing start|invigorating opening|invigorating aroma|ideal|suitable|everyday wear|special events?|special occasions|professional settings|confidence|elegance|sophistication|lasting|memorable|signature|character|balanced|modernity|energy|identity|family|complexity|grounding|quietly powerful|unexpected|finally|top notes?|heart notes?|middle notes?|base notes?)\b/i;
+  const broken=/^(?:nce|min|fume|lla|pea|affron|range blossom|app|anilla)$/i;
+  const seen=new Set();
+  return (Array.isArray(values)?values:[]).flatMap(raw=>{
+    const cleaned=String(raw||'').replace(/^[•.\-–—:;\s]+/,'').replace(/\s+/g,' ').trim();
+    if(!cleaned) return [];
+    return cleaned
+      .split(/\.\s*(?=(?:top|heart|middle|base)(?:\s+notes?)?\s*:)/i)
+      .flatMap(part=>part.split(/(?:^|\s)(?:top|heart|middle|base)(?:\s+notes?)?\s*:\s*/i))
+      .map(part=>part.replace(/^(?:and|the)\s+/i,'').replace(/[.;,:\s]+$/,'').trim())
+      .filter(Boolean);
+  }).filter(value=>{
+    if(value.length<2||value.length>48||junk.test(value)||broken.test(value)||/^(?:while|with|of|a|an)\b/i.test(value)) return false;
+    if(value.split(/\s+/).length>5) return false;
+    const key=normalized(value);
+    if(!key||seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 const DESIGNER_BRANDS=new Set(['ariana grande','azzaro','burberry','bvlgari','calvin klein','carolina herrera','chanel','chloe','coach','davidoff','dior','dolce & gabbana','dunhill','elie saab','escada','giorgio armani','givenchy','gucci','guess','hermes','hugo boss','issey miyake','jean paul gaultier','jimmy choo','juicy couture','lacoste','marc jacobs','michael kors','montblanc','moschino','mugler','narciso rodriguez','prada','rabanne','ralph lauren','tiffany & co.','tom ford','valentino','versace','viktor & rolf','yves saint laurent']);
 
 function normalized(value=''){
@@ -33,7 +55,7 @@ function setCanonical(url){
   n.href=url;
 }
 function noteBox(label,arr){
-  const vals=clean(arr);
+  const vals=cleanCustomerNotes(arr);
   if(!vals.length)return '';
   return '<div class="note-box"><b>'+label+'</b><span>'+vals.map(v=>esc(v)).join(', ')+'</span></div>';
 }
@@ -462,7 +484,7 @@ async function renderDesignerDupeSection(product,comparisons){
 
     const name=[p.brand,p.canonical_name].filter(Boolean).join(' ');
     const year=p.release_year||p.launch_year||'';
-    const allNotes=[...clean(p.top_notes),...clean(p.middle_notes),...clean(p.base_notes),...clean(p.fragrance_notes),...clean(p.accords)];
+    const allNotes=[...cleanCustomerNotes(p.top_notes),...cleanCustomerNotes(p.middle_notes),...cleanCustomerNotes(p.base_notes),...cleanCustomerNotes(p.fragrance_notes),...cleanCustomerNotes(p.accords)];
     const desc=(p.description&&p.description.trim())
       ?p.description.trim()
       :([p.canonical_name,'by',p.brand,p.concentration?'('+p.concentration+')':'','with',allNotes.slice(0,8).join(', ')].filter(Boolean).join(' '));
@@ -519,7 +541,7 @@ async function renderDesignerDupeSection(product,comparisons){
     });
     document.head.appendChild(structured);
 
-    const generic=clean(p.fragrance_notes),accords=clean(p.accords);
+    const generic=cleanCustomerNotes(p.fragrance_notes),accords=cleanCustomerNotes(p.accords);
     el('fragrance-content').innerHTML='<div class="detail">'+
       '<div class="bottle">'+
         (image?'<img src="'+esc(image)+'" alt="'+esc(name+' fragrance bottle')+'">':'<div class="muted">Bottle image coming soon.</div>')+
@@ -532,7 +554,7 @@ async function renderDesignerDupeSection(product,comparisons){
           noteBox('TOP NOTES',p.top_notes)+
           noteBox('HEART NOTES',p.middle_notes)+
           noteBox('BASE NOTES',p.base_notes)+
-          (!clean(p.top_notes).length&&!clean(p.middle_notes).length&&!clean(p.base_notes).length?noteBox('FRAGRANCE NOTES',generic):'')+
+          (!cleanCustomerNotes(p.top_notes).length&&!cleanCustomerNotes(p.middle_notes).length&&!cleanCustomerNotes(p.base_notes).length?noteBox('FRAGRANCE NOTES',generic):'')+
           noteBox('ACCORDS',accords)+
         '</div>'+
         '<section id="dupe-wrap" class="designer-dupe-section" hidden></section>'+
@@ -541,6 +563,16 @@ async function renderDesignerDupeSection(product,comparisons){
         '<a class="button" href="fragrances.html">BROWSE MORE FRAGRANCES →</a>'+
       '</div>'+
     '</div>';
+
+    const heroBottle=document.querySelector('#fragrance-content .bottle img');
+    if(heroBottle){
+      heroBottle.addEventListener('error',()=>{
+        const fallback=document.createElement('div');
+        fallback.className='muted';
+        fallback.textContent='Bottle image is refreshing. Try reloading this page.';
+        heroBottle.replaceWith(fallback);
+      },{once:true});
+    }
 
     renderShopLinks(p,el('main-shop-links'),4);
 
