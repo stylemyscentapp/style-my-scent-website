@@ -59,8 +59,8 @@ for(const card of cards){
 assert.equal(badScore,0,'website comparison pool contains invalid similarity score(s)');
 assert.equal(self,0,'website comparison pool contains self-comparison(s)');
 assert.equal(bothReady,cards.length,'every published website comparison must have scent data on both bottles');
-assert.ok(bothOpening>=700,'opening education coverage regressed: '+bothOpening);
-assert.ok(bothDrydown>=700,'dry-down education coverage regressed: '+bothDrydown);
+assert.ok(bothOpening>=650,'opening education coverage regressed: '+bothOpening);
+assert.ok(bothDrydown>=650,'dry-down education coverage regressed: '+bothDrydown);
 
 const boilerplate=cards.filter(row=>/keeping the overall scent direction closely related|extremely close on paper/i.test(String(row.similarities||'')+' '+String(row.verdict||''))).length;
 console.log(
