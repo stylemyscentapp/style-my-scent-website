@@ -245,15 +245,27 @@ function comparisonOtherSide(c,currentId){
 
 
 const COMPARISON_FAMILIES={
-  citrus:['bergamot','lemon','lime','mandarin','orange','grapefruit','citron','neroli'],
-  floral:['rose','jasmine','violet','gardenia','tuberose','orange blossom','hedione','peony','orchid'],
-  woody:['cedar','cedarwood','sandalwood','vetiver','patchouli','guaiac','oak','cashmere wood','cashmeran'],
-  musk:['musk','musky','ambrette'],
-  amberwood:['ambroxan','ambrox','ambergris','amberwood','amber woods'],
-  spice:['ginger','cardamom','pepper','pink pepper','cinnamon','nutmeg','clove','saffron'],
-  gourmand:['vanilla','tonka','caramel','praline','sugar','honey','marshmallow','chocolate','cocoa'],
-  oud:['oud','agarwood'],
-  aromatic:['lavender','lavandin','sage','rosemary','basil'],
+  citrus:['bergamot','lemon','lime','mandarin','orange','grapefruit','citron','neroli','pomelo','bitter orange'],
+  floral:['rose','jasmine','violet','gardenia','tuberose','orange blossom','orange flower','hedione','peony','orchid','lily','lily of the valley','magnolia','freesia','heliotrope','carnation','geranium','narcissus','cyclamen'],
+  woody:['cedar','cedarwood','sandalwood','vetiver','patchouli','guaiac','gaiac','oak','cashmere wood','cashmeran'],
+  musk:['musk','musks','musky','white musk','pink musk','ambrette','ambrettolide'],
+  amberwood:['ambroxan','ambrox','ambergris','amberwood','amber woods','dry amber'],
+  spice:['ginger','cardamom','pepper','pink pepper','black pepper','white pepper','cinnamon','nutmeg','clove','saffron'],
+  gourmand:['vanilla','vanilla flower','tonka','tonka bean','caramel','praline','sugar','honey','marshmallow','chocolate','cocoa'],
+  oud:['oud','agarwood','oud wood'],
+  aromatic:['lavender','lavandin','sage','clary sage','rosemary','basil','thyme','mint','spearmint'],
+  fruity:['cherry','black cherry','griotte','berry','berries','black currant','blackcurrant','cassis','raspberry','strawberry','peach','pear','apple','pineapple','plum','lychee','litchi','passionfruit','apricot','melon','fig','forest fruits'],
+  leather:['leather','suede','woodleather'],
+  tobacco:['tobacco','tobacco leaf','hookah'],
+  mossy:['moss','oakmoss','tree moss'],
+  aquatic:['aquatic','marine','sea notes','water notes','ozonic','ocean'],
+  green:['green','grass','galbanum','green notes','leaves','leaf'],
+  iris:['iris','orris','orris root'],
+  resinous:['incense','frankincense','olibanum','labdanum','myrrh','benzoin','resin','resinous','balsam','opoponax'],
+  coffee:['coffee','coffee accord','espresso','arabica'],
+  lactonic:['milk','milk mousse','cream','creamy','lactonic'],
+  nutty:['almond','bitter almond','pistachio','hazelnut','chestnut'],
+  tea:['tea','black tea','green tea'],
 };
 function noteFamily(value=''){
   const key=normalized(value);
