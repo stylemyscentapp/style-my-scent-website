@@ -11,7 +11,7 @@ const clean=(v)=>Array.isArray(v)?v.filter(Boolean):[];
 const text=(v)=>String(v??'');
 
 function cleanCustomerNotes(values=[]){
-  const junk=/\b(adding|refinement|refreshing start|invigorating opening|invigorating aroma|ideal|suitable|everyday wear|special events?|special occasions|professional settings|confidence|elegance|sophistication|lasting|memorable|signature|character|balanced|modernity|energy|identity|family|complexity|grounding|quietly powerful|unexpected|finally|top notes?|heart notes?|middle notes?|base notes?)\b/i;
+  const junk=/\b(adding|refinement|refreshing start|invigorating opening|invigorating aroma|ideal|suitable|everyday wear|special events?|special occasions|professional settings|confidence|elegance|sophistication|lasting|memorable|signature|character|balanced|modernity|energy|identity|family|complexity|grounding|quietly powerful|unexpected|finally|intriguing|refreshing|juicy energy|spicy warmth|tactile sensuality|profound grounding|citrus sparkle|invigorate|senses|https?|www|\.com|top notes?|heart notes?|middle notes?|base notes?)\b/i;
   const broken=/^(?:nce|min|fume|lla|pea|affron|range blossom|app|anilla)$/i;
   const seen=new Set();
   return (Array.isArray(values)?values:[]).flatMap(raw=>{
@@ -67,7 +67,7 @@ async function api(path){
 async function fetchProduct(productId){
   if(!productId)return null;
   const q=new URLSearchParams({
-    select:'id,canonical_name,brand,concentration,product_type,bottle_image_url,hosted_image_url,display_image_url',
+    select:'id,canonical_name,brand,concentration,product_type,top_notes,middle_notes,base_notes,fragrance_notes,accords,bottle_image_url,hosted_image_url,display_image_url',
     id:'eq.'+productId,is_active:'eq.true',verification_status:'eq.verified',limit:'1'
   });
   const rows=await api('/rest/v1/catalog_public_fragrances_v1?'+q.toString());
@@ -243,6 +243,105 @@ function comparisonOtherSide(c,currentId){
   return null;
 }
 
+
+const COMPARISON_FAMILIES={
+  citrus:['bergamot','lemon','lime','mandarin','orange','grapefruit','citron','neroli'],
+  floral:['rose','jasmine','violet','gardenia','tuberose','orange blossom','hedione','peony','orchid'],
+  woody:['cedar','cedarwood','sandalwood','vetiver','patchouli','guaiac','oak','cashmere wood','cashmeran'],
+  musk:['musk','musky','ambrette'],
+  amberwood:['ambroxan','ambrox','ambergris','amberwood','amber woods'],
+  spice:['ginger','cardamom','pepper','pink pepper','cinnamon','nutmeg','clove','saffron'],
+  gourmand:['vanilla','tonka','caramel','praline','sugar','honey','marshmallow','chocolate','cocoa'],
+  oud:['oud','agarwood'],
+  aromatic:['lavender','lavandin','sage','rosemary','basil'],
+};
+function noteFamily(value=''){
+  const key=normalized(value);
+  for(const [family,terms] of Object.entries(COMPARISON_FAMILIES)){
+    if(terms.some(term=>key===term||key.includes(term)||term.includes(key)))return family;
+  }
+  return '';
+}
+function sameNote(a='',b=''){
+  const x=normalized(a),y=normalized(b);
+  return Boolean(x&&y&&(x===y||(Math.min(x.length,y.length)>=4&&(x.includes(y)||y.includes(x)))));
+}
+function productStages(product={}){
+  return {
+    top:cleanCustomerNotes(product.top_notes),
+    heart:cleanCustomerNotes(product.middle_notes),
+    base:cleanCustomerNotes(product.base_notes),
+    general:cleanCustomerNotes(product.fragrance_notes),
+    accords:cleanCustomerNotes(product.accords),
+  };
+}
+function stageEducation(designer,alternative,stage,label){
+  const left=productStages(designer)[stage]||[];
+  const right=productStages(alternative)[stage]||[];
+  if(!left.length&&!right.length)return null;
+  const shared=[];
+  for(const l of left){
+    const r=right.find(value=>sameNote(l,value));
+    if(r)shared.push({left:l,right:r});
+    if(shared.length>=2)break;
+  }
+  if(shared.length){
+    const leftText=shared.map(x=>x.left).join(' and ');
+    const rightText=shared.map(x=>x.right).join(' and ');
+    const note=sameNote(leftText,rightText)?leftText:leftText+' / '+rightText;
+    return {connected:true,label,text:label+': both keep '+note+' in play, so this part of the wear has a real structural bridge.'};
+  }
+  for(const l of left){
+    const lf=noteFamily(l);
+    if(!lf)continue;
+    const r=right.find(value=>noteFamily(value)===lf);
+    if(r)return {connected:true,label,text:label+': '+designer.canonical_name+' uses '+l+', while '+alternative.canonical_name+' uses '+r+'. They stay in the same '+lf+' family without being note-for-note identical.'};
+  }
+  if(left.length&&right.length){
+    return {connected:false,label,text:label+': '+designer.canonical_name+' leans on '+left.slice(0,2).join(' and ')+', while '+alternative.canonical_name+' moves through '+right.slice(0,2).join(' and ')+'. This is a real point of separation.'};
+  }
+  return null;
+}
+function comparisonEducation(comparison,alternative,designer,wear=null){
+  const facts=[
+    stageEducation(designer,alternative,'top','Opening'),
+    stageEducation(designer,alternative,'heart','Heart'),
+    stageEducation(designer,alternative,'base','Dry-down'),
+  ].filter(Boolean);
+  const connections=facts.filter(x=>x.connected);
+  const shared=cleanCustomerNotes(comparison?.shared_notes||[]);
+  let snapshot='';
+  if(connections.length){
+    snapshot=connections[0].text.replace(/^[^:]+:\s*/,'')+' That is the kind of overlap I want to see before I call something a serious alternative.';
+  }else if(shared.length){
+    snapshot='The verified comparison lists '+shared.slice(0,3).join(', ')+' as shared material. I’m treating that as the starting point, not as proof that the whole wear is identical.';
+  }else{
+    snapshot='This comparison is verified, but the published scent profiles do not give me enough note-level structure to explain the resemblance confidently. I’m keeping the claim conservative.';
+  }
+
+  const breakdown=facts.map(x=>x.text);
+  if(!breakdown.length&&wear){
+    const opening=stylistWearCopy('opening',wear.opening_comparison,alternative,designer);
+    const dry=stylistWearCopy('drydown',wear.drydown_comparison,alternative,designer);
+    if(opening)breakdown.push('Opening: '+opening);
+    if(dry)breakdown.push('Dry-down: '+dry);
+  }
+
+  const baseFact=facts.find(x=>x.label==='Dry-down');
+  const topFact=facts.find(x=>x.label==='Opening');
+  let action='';
+  if(baseFact){
+    action='Test the dry-down first. '+baseFact.text.replace(/^Dry-down:\s*/,'')+' If that finish is the part you love in '+designer.canonical_name+', it is the make-or-break point for this alternative.';
+  }else if(topFact){
+    action='Compare the first 20–30 minutes on skin. '+topFact.text.replace(/^Opening:\s*/,'')+' Then wait for the base before deciding whether the similarity percentage matches your nose.';
+  }else{
+    action='Use the similarity score as a reference point only. Wear '+designer.canonical_name+' and '+alternative.canonical_name+' side by side before treating them as interchangeable.';
+  }
+  const performance=wear?stylistWearCopy('performance',wear.performance_comparison,alternative,designer):'';
+  if(performance)action+=' '+performance;
+  return {snapshot,breakdown,action};
+}
+
 function stylistDupeReason(comparison,alternative,designer){
   const sim=Number(comparison?.estimated_similarity);
   const clean=(value='')=>String(value||'').replace(/\s+/g,' ').trim();
@@ -272,11 +371,7 @@ function stylistDupeReason(comparison,alternative,designer){
     return `The match is anchored by ${notes}. That shared structure keeps ${alternative?.canonical_name||'the alternative'} close to ${designer?.canonical_name||'the designer'} while still leaving room for its own finish.`;
   }
 
-  if(Number.isFinite(sim)){
-    if(sim>=90) return `At about ${Math.round(sim)}% similarity, this is one of the closest alternatives I would put beside ${designer?.canonical_name||'the designer'}. The overall scent identity stays very familiar, with the differences showing up mostly in texture and drydown.`;
-    if(sim>=80) return `At about ${Math.round(sim)}% similarity, this is a strong alternative: the signature stays recognizable, while the supporting notes give it a little more personality of its own.`;
-  }
-  return `This keeps the same recognizable scent direction as ${designer?.canonical_name||'the designer'}, with enough overlap to feel familiar and enough difference to keep its own character.`;
+  return 'Comparison detail is limited here. The similarity score stays visible, but I’m not using the percentage as a substitute for scent evidence.';
 }
 
 async function renderDesignerDupeSection(product,comparisons){
@@ -357,7 +452,7 @@ async function renderDesignerDupeSection(product,comparisons){
 
   const title=document.createElement('h3');
   title.className='compare-section-title';
-  title.textContent='Keep the designer, or get the same mood for less.';
+  title.textContent='Compare the scent structure before you decide.';
   host.appendChild(title);
 
   const intro=document.createElement('p');
