@@ -12,6 +12,8 @@ assert.match(fragrance,/MAX_DUPES_PER_DESIGNER=2/,'website must keep max two dup
 for(const label of ['SNAPSHOT','BREAKDOWN','ACTION']) assert.ok(fragrance.includes(label),'fragrance page missing '+label);
 assert.ok(fragrance.includes('comparisonEducation'),'designer page must use structured comparison education');
 assert.ok(discover.includes('profileComparisonEducation'),'Discover detail must use structured comparison education');
+assert.ok(discover.includes('score_publishable'),'Discover must honor score publishability');
+assert.ok(fragrance.includes('score_publishable'),'designer dupe cards must honor score publishability');
 assert.doesNotMatch(fragrance,/At about .*% similarity/i,'percentage-only dupe reasoning must stay removed');
 assert.doesNotMatch(fragrance,/same recognizable scent direction/i,'generic scent-direction fallback must stay removed');
 assert.ok(fragrance.includes("deal.saleVariant==='Retail bottle'"),'website pricing must keep tester/non-retail exclusion');
@@ -26,7 +28,7 @@ async function get(path,params){
 const cards=[];
 for(let offset=0;;offset+=500){
   const page=await get('catalog_public_comparison_cards_v1',new URLSearchParams({
-    select:'comparison_id,fragrance_id,compared_fragrance_id,estimated_similarity,shared_notes,similarities,differences,verdict',
+    select:'comparison_id,fragrance_id,compared_fragrance_id,estimated_similarity,score_publishable,shared_notes,similarities,differences,verdict',
     order:'comparison_id.asc',limit:'500',offset:String(offset)
   }));
   cards.push(...page);
@@ -45,7 +47,7 @@ for(let i=0;i<ids.length;i+=70){
 }
 const count=x=>Array.isArray(x)?x.filter(Boolean).length:0;
 const profileReady=row=>row&&['top_notes','middle_notes','base_notes','fragrance_notes','accords'].some(k=>count(row[k])>0);
-let bothReady=0,bothOpening=0,bothDrydown=0,badScore=0,self=0;
+let bothReady=0,bothOpening=0,bothDrydown=0,badScore=0,self=0,scoreHeld=0,scorePublished=0,scorePolicyMissing=0;
 for(const card of cards){
   const original=profiles.get(card.compared_fragrance_id);
   const alternative=profiles.get(card.fragrance_id);
@@ -54,10 +56,15 @@ for(const card of cards){
   if(count(original?.base_notes)&&count(alternative?.base_notes)) bothDrydown++;
   const score=Number(card.estimated_similarity);
   if(!Number.isFinite(score)||score<60||score>100) badScore++;
+  if(typeof card.score_publishable!=='boolean') scorePolicyMissing++;
+  else if(card.score_publishable) scorePublished++;
+  else scoreHeld++;
   if(card.fragrance_id===card.compared_fragrance_id) self++;
 }
 assert.equal(badScore,0,'website comparison pool contains invalid similarity score(s)');
 assert.equal(self,0,'website comparison pool contains self-comparison(s)');
+assert.equal(scorePolicyMissing,0,'website comparison pool is missing score publishability metadata');
+assert.ok(scoreHeld<=20,'too many website matches have a held exact percentage: '+scoreHeld);
 assert.equal(bothReady,cards.length,'every published website comparison must have scent data on both bottles');
 assert.ok(bothOpening>=650,'opening education coverage regressed: '+bothOpening);
 assert.ok(bothDrydown>=650,'dry-down education coverage regressed: '+bothDrydown);
@@ -68,5 +75,7 @@ console.log(
   cards.length+' public comparisons,',
   bothOpening+' with opening-to-opening detail,',
   bothDrydown+' with dry-down-to-dry-down detail,',
+  scorePublished+' defensible published percentages,',
+  scoreHeld+' valid matches with the exact percentage held,',
   boilerplate+' legacy boilerplate evidence rows safely overridden by structured website education.'
 );
