@@ -25,6 +25,8 @@ async function get(path,params){
   return res.json();
 }
 
+
+const sourcePoison=/(https?|www\.|\.com|awaken the senses|invigorate the senses|lasting impression|ideal for|perfect for|adds depth|brings warmth|grounding comfort|playful freshness|vibrant fruitiness|delicate softness|regardless of|refreshing scent)/i;
 const cards=[];
 for(let offset=0;;offset+=500){
   const page=await get('catalog_public_comparison_cards_v1',new URLSearchParams({
@@ -37,13 +39,24 @@ for(let offset=0;;offset+=500){
 assert.ok(cards.length>=1300,'website public comparison pool unexpectedly small: '+cards.length);
 
 const ids=[...new Set(cards.flatMap(r=>[r.fragrance_id,r.compared_fragrance_id]).filter(Boolean))];
+let sourcePoisonProfiles=0;
 const profiles=new Map();
 for(let i=0;i<ids.length;i+=70){
   const rows=await get('catalog_public_fragrances_v1',new URLSearchParams({
     select:'id,top_notes,middle_notes,base_notes,fragrance_notes,accords',
     id:'in.('+ids.slice(i,i+70).join(',')+')'
   }));
-  rows.forEach(row=>profiles.set(row.id,row));
+  rows.forEach(row=>{
+    const rawTerms=[
+      ...(Array.isArray(row.top_notes)?row.top_notes:[]),
+      ...(Array.isArray(row.middle_notes)?row.middle_notes:[]),
+      ...(Array.isArray(row.base_notes)?row.base_notes:[]),
+      ...(Array.isArray(row.fragrance_notes)?row.fragrance_notes:[]),
+      ...(Array.isArray(row.accords)?row.accords:[]),
+    ];
+    if(rawTerms.some(value=>sourcePoison.test(String(value||'')) || String(value||'').length>80)) sourcePoisonProfiles++;
+    profiles.set(row.id,row);
+  });
 }
 const count=x=>Array.isArray(x)?x.filter(Boolean).length:0;
 const profileReady=row=>row&&['top_notes','middle_notes','base_notes','fragrance_notes','accords'].some(k=>count(row[k])>0);
@@ -61,6 +74,7 @@ for(const card of cards){
   else scoreHeld++;
   if(card.fragrance_id===card.compared_fragrance_id) self++;
 }
+assert.equal(sourcePoisonProfiles,0,'website comparison profiles contain marketing/URL prose: '+sourcePoisonProfiles);
 assert.equal(badScore,0,'website comparison pool contains invalid similarity score(s)');
 assert.equal(self,0,'website comparison pool contains self-comparison(s)');
 assert.equal(scorePolicyMissing,0,'website comparison pool is missing score publishability metadata');
