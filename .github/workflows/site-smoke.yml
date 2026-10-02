@@ -14,8 +14,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate Discover JavaScript
-        run: node --check discover.js
+      - name: Validate comparison JavaScript
+        run: |
+          node --check discover.js
+          node --check fragrance.js
 
       - name: Verify launch legal and support pages
         run: |
@@ -28,6 +30,18 @@ jobs:
           grep -q 'affiliate-disclosure.html' index.html
           grep -q 'support.html' index.html
           grep -q 'delete-account.html' index.html
+
+      - name: Verify dupe education contract
+        run: |
+          grep -q "MAX_DUPES_PER_DESIGNER=2" fragrance.js
+          grep -q "SNAPSHOT" fragrance.js
+          grep -q "BREAKDOWN" fragrance.js
+          grep -q "ACTION" fragrance.js
+          grep -q "comparisonEducation" fragrance.js
+          grep -q "profileComparisonEducation" discover.js
+          grep -q "Use the similarity score as a reference" fragrance.js
+          ! grep -q "At about .*% similarity" fragrance.js
+          ! grep -q "same recognizable scent direction" fragrance.js
 
       - name: Verify Discover affiliate safety
         run: |
