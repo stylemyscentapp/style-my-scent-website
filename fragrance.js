@@ -499,47 +499,48 @@ async function renderDesignerDupeSection(product,comparisons){
     }
 
     if(comparison){
-      const whyBox=document.createElement('div');
-      whyBox.className='designer-dupe-why';
-      const whyLabel=document.createElement('b');
-      whyLabel.textContent="WHY ADDISON LIKES THIS MATCH";
-      const whyText=document.createElement('p');
-      whyText.textContent=stylistDupeReason(comparison,prod,product);
-      whyBox.append(whyLabel,whyText);
-      card.appendChild(whyBox);
-    }
+      const education=comparisonEducation(comparison,prod,product,wear);
 
-    if(comparison && wear){
-      const opening=stylistWearCopy('opening',wear.opening_comparison,prod,product);
-      const drydown=stylistWearCopy('drydown',wear.drydown_comparison,prod,product);
-      const performance=stylistWearCopy('performance',wear.performance_comparison,prod,product);
-      if(opening||drydown||performance){
-        const wearBox=document.createElement('div');
-        wearBox.className='designer-dupe-wear';
-        const wearLabel=document.createElement('b');
-        wearLabel.textContent='HOW THE SCENTS DEVELOP';
-        wearBox.appendChild(wearLabel);
-        if(opening){
+      const snapshotBox=document.createElement('div');
+      snapshotBox.className='designer-dupe-why';
+      const snapshotLabel=document.createElement('b');
+      snapshotLabel.textContent='SNAPSHOT';
+      const snapshotText=document.createElement('p');
+      snapshotText.textContent=education.snapshot;
+      snapshotBox.append(snapshotLabel,snapshotText);
+      card.appendChild(snapshotBox);
+
+      const breakdownBox=document.createElement('div');
+      breakdownBox.className='designer-dupe-wear';
+      const breakdownLabel=document.createElement('b');
+      breakdownLabel.textContent='BREAKDOWN';
+      breakdownBox.appendChild(breakdownLabel);
+      if(education.breakdown.length){
+        education.breakdown.forEach(line=>{
           const p=document.createElement('p');
-          p.innerHTML='<strong>Opening:</strong> '+esc(opening);
-          wearBox.appendChild(p);
-        }
-        if(drydown){
-          const p=document.createElement('p');
-          p.innerHTML='<strong>Dry-down:</strong> '+esc(drydown);
-          wearBox.appendChild(p);
-        }
-        if(performance){
-          const p=document.createElement('p');
-          p.innerHTML='<strong>Performance:</strong> '+esc(performance);
-          wearBox.appendChild(p);
-        }
-        const note=document.createElement('p');
-        note.className='designer-dupe-wear-note';
-        note.textContent='Dry-down is a scent-direction guide; skin chemistry, climate and application can shift the exact wear.';
-        wearBox.appendChild(note);
-        card.appendChild(wearBox);
+          const split=line.indexOf(':');
+          if(split>0){
+            p.innerHTML='<strong>'+esc(line.slice(0,split))+':</strong> '+esc(line.slice(split+1).trim());
+          }else{
+            p.textContent=line;
+          }
+          breakdownBox.appendChild(p);
+        });
+      }else{
+        const p=document.createElement('p');
+        p.textContent='Detailed opening, heart, and dry-down information is limited for this match, so I’m not filling the space with generic copy.';
+        breakdownBox.appendChild(p);
       }
+      card.appendChild(breakdownBox);
+
+      const actionBox=document.createElement('div');
+      actionBox.className='designer-dupe-why';
+      const actionLabel=document.createElement('b');
+      actionLabel.textContent='ACTION';
+      const actionText=document.createElement('p');
+      actionText.textContent=education.action;
+      actionBox.append(actionLabel,actionText);
+      card.appendChild(actionBox);
     }
 
     const shop=document.createElement('div');
