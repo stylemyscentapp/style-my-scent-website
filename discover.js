@@ -752,7 +752,7 @@ async function fetchAffiliateOffers(product){
   const q=[product.brand,product.name,product.concentration].filter(Boolean).join(' ').trim();
   if(!q) return [];
   try{
-    const directRequest=product.id?fetch(SMS_SUPABASE_URL+'/rest/v1/retailer_offers?select=retailer_name,product_title,concentration,size_ml,price,currency,affiliate_url,product_url&fragrance_id=eq.'+encodeURIComponent(product.id)+'&verified=eq.true&in_stock=eq.true&order=price.asc&limit=50',{headers:{apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY}}).then(async r=>r.ok?await r.json():[]).catch(()=>[]):Promise.resolve([]);
+    const directRequest=product.id?fetch(SMS_SUPABASE_URL+'/rest/v1/retailer_offers?select=retailer_name,product_title,concentration,size_ml,price,currency,affiliate_url,product_url,last_checked_at&fragrance_id=eq.'+encodeURIComponent(product.id)+'&verified=eq.true&in_stock=eq.true&order=price.asc&limit=50',{headers:{apikey:SMS_SUPABASE_KEY,Authorization:'Bearer '+SMS_SUPABASE_KEY}}).then(async r=>r.ok?await r.json():[]).catch(()=>[]):Promise.resolve([]);
     const response=await fetch(SMS_CJ_URL+'?q='+encodeURIComponent(q)+'&channel=website',{
       headers:{apikey:SMS_SUPABASE_KEY,Accept:'application/json'}
     }).catch(()=>({ok:false}));
@@ -770,7 +770,12 @@ async function fetchAffiliateOffers(product){
       return '';
     };
     const wanted=concentrationKey(product.concentration);
-    const exact=direct.filter(offer=>!wanted||concentrationKey(offer.concentration||offer.product_title)===wanted).map(offer=>({title:offer.product_title,retailer:offer.retailer_name,price:Number(offer.price),currency:offer.currency,sizeMl:Number(offer.size_ml)||null,saleVariant:/tester/i.test(offer.product_title||'')?'Tester':'Retail bottle',affiliateUrl:offer.affiliate_url||offer.product_url}));
+    const freshCutoff=Date.now()-(10*60*1000);
+    const exact=direct.filter(offer=>{
+      const checked=Date.parse(offer.last_checked_at||'');
+      const fresh=Number.isFinite(checked)&&checked>=freshCutoff;
+      return fresh && (!wanted||concentrationKey(offer.concentration||offer.product_title)===wanted);
+    }).map(offer=>({title:offer.product_title,retailer:offer.retailer_name,price:Number(offer.price),currency:offer.currency,sizeMl:Number(offer.size_ml)||null,saleVariant:/tester/i.test(offer.product_title||'')?'Tester':'Retail bottle',affiliateUrl:offer.affiliate_url||offer.product_url}));
     const cj=(data.deals||[]).filter(deal=>{
       const hay=normalized((deal.title||'')+' '+(deal.description||''));
       return nameTokens.every(t=>hay.includes(t)) && brandTokens.every(t=>hay.includes(t)) && (!wanted||concentrationKey((deal.title||'')+' '+(deal.description||''))===wanted) && ['Retail bottle','Tester'].includes(deal.saleVariant) && safeHttpsUrl(deal.affiliateUrl);
