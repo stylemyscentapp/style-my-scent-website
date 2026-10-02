@@ -507,14 +507,40 @@ async function fetchComparisons(query='',signal,{offset:sourceOffset=0,pageLimit
 
 const SMS_COMPACT_PROFILE_CACHE=new Map();
 
+function cleanCustomerNotes(values=[]){
+  const junk=/\b(adding|refinement|refreshing start|invigorating opening|invigorating aroma|ideal|suitable|everyday wear|special events?|special occasions|professional settings|confidence|elegance|sophistication|lasting|memorable|signature|character|balanced|modernity|energy|identity|family|complexity|grounding|quietly powerful|unexpected|finally|top notes?|heart notes?|middle notes?|base notes?)\b/i;
+  const broken=/^(?:nce|min|fume|lla|pea|affron|range blossom|app|anilla)$/i;
+  const seen=new Set();
+  return (Array.isArray(values)?values:[]).flatMap(raw=>{
+    const cleaned=String(raw||'').replace(/^[•.\-–—:;\s]+/,'').replace(/\s+/g,' ').trim();
+    if(!cleaned) return [];
+    return cleaned
+      .split(/\.\s*(?=(?:top|heart|middle|base)(?:\s+notes?)?\s*:)/i)
+      .flatMap(part=>part.split(/(?:^|\s)(?:top|heart|middle|base)(?:\s+notes?)?\s*:\s*/i))
+      .map(part=>part.replace(/^(?:and|the)\s+/i,'').replace(/[.;,:\s]+$/,'').trim())
+      .filter(Boolean);
+  }).filter(value=>{
+    if(value.length<2||value.length>48||junk.test(value)||broken.test(value)||/^(?:while|with|of|a|an)\b/i.test(value)) return false;
+    if(value.split(/\s+/).length>5) return false;
+    const key=normalized(value);
+    if(!key||seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function bestCustomerNotes(...lists){
+  return lists.map(cleanCustomerNotes).sort((a,b)=>b.length-a.length)[0]||[];
+}
+
 function compactProfileNotes(row={}){
   const staged=[
-    ...(Array.isArray(row.top_notes)?row.top_notes:[]),
-    ...(Array.isArray(row.middle_notes)?row.middle_notes:[]),
-    ...(Array.isArray(row.base_notes)?row.base_notes:[])
-  ].filter(Boolean);
-  const general=(Array.isArray(row.fragrance_notes)?row.fragrance_notes:[]).filter(Boolean);
-  const accords=(Array.isArray(row.accords)?row.accords:[]).filter(Boolean);
+    ...cleanCustomerNotes(row.top_notes),
+    ...cleanCustomerNotes(row.middle_notes),
+    ...cleanCustomerNotes(row.base_notes)
+  ];
+  const general=cleanCustomerNotes(row.fragrance_notes);
+  const accords=cleanCustomerNotes(row.accords);
   return [...new Set(staged.length?staged:(general.length?general:accords))].slice(0,4);
 }
 
@@ -570,12 +596,7 @@ async function fetchProfile(product){
   const addison=addisonRes.ok?(await addisonRes.json())[0]:null;
   const discover=discoverRes.ok?(await discoverRes.json())[0]:null;
   const dnotes=discover?.notes||{};
-  const pick=(...lists)=>{
-    for(const list of lists){
-      if(Array.isArray(list)&&list.filter(Boolean).length) return list.filter(Boolean);
-    }
-    return [];
-  };
+  const pick=(...lists)=>bestCustomerNotes(...lists);
   return {
     ...product,
     brand:row.brand||product.brand,
@@ -604,6 +625,9 @@ function notesCard(product,label){
     img.alt=[product.brand,product.name,'bottle'].filter(Boolean).join(' ');
     img.loading='lazy';
     img.referrerPolicy='no-referrer';
+    img.addEventListener('error',()=>{
+      img.replaceWith(textEl('div','fallback',(product.brand||'SMS').slice(0,3).toUpperCase()));
+    },{once:true});
     card.appendChild(img);
   }
 
