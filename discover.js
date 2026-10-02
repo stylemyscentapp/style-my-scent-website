@@ -928,8 +928,8 @@ function renderCompareCard(row,openDetail){
   card.appendChild(pair);
 
   const similarity=Number(row.estimated_similarity);
-  if(row.score_publishable!==false&&Number.isFinite(similarity)) card.appendChild(textEl('div','web-compare-score','≈ '+Math.round(similarity)+'% SIMILAR'));
-  else if(row.score_publishable===false) card.appendChild(textEl('div','web-compare-score','SCENT MATCH • SEE BREAKDOWN'));
+  if(row.score_publishable===true&&Number.isFinite(similarity)) card.appendChild(textEl('div','web-compare-score','≈ '+Math.round(similarity)+'% SIMILAR'));
+  else if(row.score_publishable!==true) card.appendChild(textEl('div','web-compare-score','SCENT MATCH • SEE BREAKDOWN'));
 
   const similarities=addisonComparisonCopy('same',row.similarities,row);
   const differences=addisonComparisonCopy('different',row.differences,row);
@@ -1002,9 +1002,9 @@ async function renderDetail(row,focusShop=''){
   pair.appendChild(bottleSide(alternative,'ALTERNATIVE'));
   detail.appendChild(pair);
 
-  if(row.score_publishable!==false&&Number.isFinite(similarity)){
+  if(row.score_publishable===true&&Number.isFinite(similarity)){
     detail.appendChild(textEl('div','web-compare-score','≈ '+Math.round(similarity)+'% SIMILAR'));
-  }else if(row.score_publishable===false){
+  }else if(row.score_publishable!==true){
     detail.appendChild(textEl('div','web-compare-score','SCENT MATCH • PERCENTAGE HELD'));
   }
 
@@ -1078,9 +1078,9 @@ function renderCompareCardFallback(row,openDetail){
   card.appendChild(textEl('h3','web-detail-title',
     [original.brand,original.name,'↔',alternative.brand,alternative.name].filter(Boolean).join(' ')
   ));
-  if(row.score_publishable!==false&&Number.isFinite(similarity)){
+  if(row.score_publishable===true&&Number.isFinite(similarity)){
     card.appendChild(textEl('div','web-compare-score','≈ '+Math.round(similarity)+'% SIMILAR'));
-  }else if(row.score_publishable===false){
+  }else if(row.score_publishable!==true){
     card.appendChild(textEl('div','web-compare-score','SCENT MATCH • SEE BREAKDOWN'));
   }
   const actions=document.createElement('div');
@@ -1257,7 +1257,7 @@ async function openDealDetail(row){
     if(!matches.length) detail.appendChild(textEl('p','','No published comparison is available for this exact bottle yet.'));
     for(const match of matches){
       const other=productFromComparison(match,match.fragrance_id===product.id?'original':'alternative');
-      const scoreLabel=match.score_publishable!==false?' — ≈ '+Math.round(Number(match.estimated_similarity))+'%':' — SCENT MATCH';
+      const scoreLabel=match.score_publishable===true?' — ≈ '+Math.round(Number(match.estimated_similarity))+'%':' — SCENT MATCH';
       const button=buttonEl([other.brand,other.name].filter(Boolean).join(' ')+scoreLabel+' • VIEW COMPARISON');
       button.style.marginBottom='12px';
       button.addEventListener('click',()=>renderDetail(match));
