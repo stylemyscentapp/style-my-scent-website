@@ -5,7 +5,9 @@ on:
     branches: [main]
     paths:
       - "discover.js"
+      - "fragrance.js"
       - "index.html"
+      - "scripts/dupe-education-live-audit.mjs"
       - ".github/workflows/website-match-regression.yml"
   workflow_dispatch:
   schedule:
@@ -18,6 +20,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Audit live dupe education
+        run: node scripts/dupe-education-live-audit.mjs
 
       - name: Verify 300 launch-ready public matches and key searches
         run: |
