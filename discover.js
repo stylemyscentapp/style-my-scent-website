@@ -751,7 +751,11 @@ function webNoteFamily(value=''){
 }
 function webSameNote(a='',b=''){
   const x=normalized(a),y=normalized(b);
-  return Boolean(x&&y&&(x===y||(Math.min(x.length,y.length)>=4&&(x.includes(y)||y.includes(x)))));
+  if(!x||!y) return false;
+  if(x===y) return true;
+  const xt=x.split(' ').filter(Boolean),yt=y.split(' ').filter(Boolean);
+  const subset=(small,large)=>small.length>0&&small.every(token=>large.includes(token))&&small.some(token=>token.length>=4);
+  return subset(xt,yt)||subset(yt,xt);
 }
 function profileStageFact(original,alternative,key,label){
   const left=Array.isArray(original?.notes?.[key])?original.notes[key].filter(Boolean):[];
