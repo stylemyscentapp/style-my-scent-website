@@ -943,8 +943,8 @@ async function renderDetail(row,focusShop=''){
   summary.className='web-detail-card web-comparison-details';
   summary.style.marginTop='16px';
   const sections=[
-    ['What feels the same',addisonComparisonCopy('same',row.similarities,row)||'These two scents share a recognizable overall scent direction.'],
-    ['Where they differ',addisonComparisonCopy('different',row.differences,row)||'They keep distinct balance, texture, and wear even where the overall direction overlaps.'],
+    ['What feels the same',addisonComparisonCopy('same',row.similarities,row)||'Similarity detail is limited for this comparison, so I’m not going to overstate the match.'],
+    ['Where they differ',addisonComparisonCopy('different',row.differences,row)||'Difference detail is limited for this comparison, so I’m keeping the call conservative.'],
     ['Opening',opening||'Opening detail is limited for this comparison.'],
     ['Dry-down',drydown||'Dry-down detail is limited for this comparison.']
   ];
