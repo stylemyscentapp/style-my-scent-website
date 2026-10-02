@@ -731,7 +731,7 @@ async function renderDesignerDupeSection(product,comparisons){
           wrap.innerHTML='<div class="eyebrow">ADDISON ALSO LIKES</div>'+
             moreReady.map(({c,other,sim})=>
               '<div class="compare"><h3>'+esc([other.brand,other.name].filter(Boolean).join(' '))+'</h3>'+
-              '<div class="muted">≈ '+Math.round(sim)+'% similar · '+
+              '<div class="muted">'+(c.score_publishable===true?'≈ '+Math.round(sim)+'% similar':'SCENT MATCH')+' · '+
               esc(stylistDupeReason(c,{canonical_name:other.name},{canonical_name:p.canonical_name}))+
               '</div></div>'
             ).join('');
